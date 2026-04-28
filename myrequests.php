@@ -3,7 +3,6 @@
 $taxpayer_number = "123456789"; 
 $taxpayer_name = "شركة العقبة للتجارة العامة"; 
 
-// محاكاة لبيانات جدول الطلبات
 $requests = [
     ['transaction_num' => 'TRX-10293', 'service_name' => 'إصدار براءة ذمة', 'date' => '2026-04-20', 'status' => 'مكتمل'],
     ['transaction_num' => 'TRX-10304', 'service_name' => 'تعديل إقرار ضريبي', 'date' => '2026-04-25', 'status' => 'قيد المراجعة'],
@@ -18,7 +17,6 @@ $requests = [
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>طلباتي</title>
     <style>
-        /* التنسيقات العامة الأساسية */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: #f4f4f4; 
@@ -30,12 +28,12 @@ $requests = [
             min-height: 100vh;
         }
 
-        /* الحاوية الرئيسية (تم تكبيرها) */
+        /* --- تعديل حجم الشاشة هنا --- */
         .window-container {
             background-color: #ffffff;
-            width: 95%; /* زيادة العرض ليأخذ مساحة أكبر من الشاشة */
-            max-width: 1400px; /* زيادة الحد الأقصى للعرض */
-            min-height: 95vh; /* زيادة الارتفاع ليمتد تقريباً على طول الشاشة */
+            width: 85%; /* تم تصغيرها من 95% إلى 85% */
+            max-width: 1100px; /* تم تصغير الحد الأقصى من 1400px إلى 1100px */
+            min-height: 90vh; 
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
             position: relative;
             display: flex;
@@ -43,76 +41,61 @@ $requests = [
             border: 1px solid #ccc;
         }
 
-        /* ترويسة الشاشة */
         .header-banner {
             width: 100%;
-            height: 100px; /* تكبير الهيدر قليلاً */
+            height: 120px; 
             background-color: #ffffff;
-            border-bottom: 6px solid #3b71ca; 
+            border-bottom: 6px solid #4873c4;
+            overflow: hidden;
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            padding: 0 40px;
-            box-sizing: border-box;
+            justify-content: center;
         }
 
-        .header-text {
-            text-align: left;
-            font-size: 16px;
-            font-weight: bold;
-            color: #333;
-            line-height: 1.5;
+        .header-image {
+            width: 100%;
+            height: 100%;
+            object-fit: fill; 
         }
 
-        .header-logo {
-            text-align: right;
-            font-size: 18px;
-            font-weight: bold;
-            color: #b31b1b; 
-        }
-
-        /* العنوان الرئيسي */
         .page-title {
             text-align: center;
-            font-size: 32px; /* تكبير الخط */
+            font-size: 28px; 
             font-weight: bold;
-            margin: 40px 0;
+            margin: 30px 0;
             color: #000;
         }
 
-        /* قسم معلومات المكلف */
         .info-section {
             display: flex;
             justify-content: center;
-            gap: 200px; /* زيادة المسافة بين الحقلين */
-            margin-bottom: 50px;
+            gap: 100px; /* تقليل المسافة لتناسب الحجم الجديد */
+            margin-bottom: 40px;
         }
 
         .input-group {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 12px;
+            gap: 8px;
         }
 
         .input-group label {
             font-weight: bold;
-            font-size: 18px; /* تكبير الخط */
+            font-size: 16px;
             color: #000;
         }
 
         .input-group input {
-            width: 300px; /* تكبير الحقل */
+            width: 250px; 
             padding: 10px;
             border: 1px solid #7a7a7a;
             text-align: center;
-            font-size: 18px; /* تكبير الخط داخل الحقل */
-            background-color: #ffffff; 
+            font-size: 16px;
         }
 
-        /* قسم الجدول */
         .table-container {
-            padding: 0 80px;
+            padding: 0 40px; /* تقليل الحشو الجانبي */
             flex-grow: 1; 
         }
 
@@ -124,84 +107,44 @@ $requests = [
 
         th, td {
             border: 1px solid #7a7a7a;
-            padding: 15px; /* زيادة الحشوة الداخلية لتكبير الخلايا */
+            padding: 12px;
             text-align: center;
         }
 
         th {
-            background-color: #ffffff;
+            background-color: #f9f9f9;
             font-weight: bold;
-            color: #666; 
-            font-size: 18px; /* تكبير خط العناوين */
+            font-size: 16px;
         }
 
-        td {
-            font-size: 16px; /* تكبير خط البيانات */
-            color: #000;
-        }
+     
 
-        /* زر الـ AI الجانبي */
-        .ai-btn {
-            position: absolute;
-            left: 0;
-            top: 50%;
-            transform: translateY(-50%);
-            background-color: #4169e1; 
-            color: white;
-            border: none;
-            width: 70px; /* تكبير الزر */
-            height: 70px;
-            font-size: 24px;
-            font-weight: bold;
-            cursor: pointer;
-            box-shadow: 2px 2px 5px rgba(0,0,0,0.2);
-            transition: 0.3s;
-        }
-
-        .ai-btn:hover {
-            background-color: #2744a0;
-        }
-
-        /* الأزرار السفلية */
         .footer-actions {
             display: flex;
             justify-content: center;
-            gap: 50px;
-            padding: 50px 0;
+            gap: 30px;
+            padding: 40px 0;
         }
 
         .action-btn {
             background-color: #4169e1;
             color: white;
             border: none;
-            width: 160px; /* تكبير الزر */
-            padding: 15px 0;
-            font-size: 18px; /* تكبير الخط */
+            width: 140px;
+            padding: 12px 0;
+            font-size: 16px;
             font-weight: bold;
             cursor: pointer;
-            transition: 0.3s;
         }
-
-        .action-btn:hover {
-            background-color: #2744a0;
-        }
-
     </style>
 </head>
 <body>
 
     <div class="window-container">
-        
         <div class="header-banner">
-            <div class="header-text">
-                بوابة الخدمات الإلكترونية
-            </div>
-            <div class="header-logo">
-                المملكة الأردنية الهاشمية<br>وزارة المالية<br><span style="color: #4169e1;">دائرة ضريبة الدخل والمبيعات</span>
-            </div>
+            <img src="photo.jpeg" alt="شعار دائرة ضريبة الدخل والمبيعات" class="header-image">
         </div>
 
-        <button type="button" class="ai-btn" title="مساعد الذكاء الاصطناعي">AI</button>
 
         <div class="page-title">طلباتي</div>
 
@@ -227,20 +170,14 @@ $requests = [
                     </tr>
                 </thead>
                 <tbody>
-                    <?php if (!empty($requests)): ?>
-                        <?php foreach ($requests as $request): ?>
-                            <tr>
-                                <td><?php echo htmlspecialchars($request['transaction_num']); ?></td>
-                                <td><?php echo htmlspecialchars($request['service_name']); ?></td>
-                                <td><?php echo htmlspecialchars($request['date']); ?></td>
-                                <td><?php echo htmlspecialchars($request['status']); ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php else: ?>
-                        <tr><td colspan="4" style="height: 50px;"></td></tr>
-                        <tr><td colspan="4" style="height: 50px;"></td></tr>
-                        <tr><td colspan="4" style="height: 50px;"></td></tr>
-                    <?php endif; ?>
+                    <?php foreach ($requests as $request): ?>
+                        <tr>
+                            <td><?php echo htmlspecialchars($request['transaction_num']); ?></td>
+                            <td><?php echo htmlspecialchars($request['service_name']); ?></td>
+                            <td><?php echo htmlspecialchars($request['date']); ?></td>
+                            <td><?php echo htmlspecialchars($request['status']); ?></td>
+                        </tr>
+                    <?php endforeach; ?>
                 </tbody>
             </table>
         </div>
@@ -249,7 +186,6 @@ $requests = [
             <button type="button" class="action-btn" onclick="window.location.href='mains.php'">إغلاق</button>
             <button type="button" class="action-btn" onclick="window.print();">طباعة</button>
         </div>
-
     </div>
 
 </body>

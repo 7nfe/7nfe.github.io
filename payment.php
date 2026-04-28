@@ -1,5 +1,5 @@
 <?php
-// بيانات تجريبية للمكلف
+// بيانات تجريبية للمكلف (يمكن ربطها بقاعدة البيانات لاحقاً)
 $taxpayer_number = "123456789";
 $taxpayer_name = "شركة العقبة للتجارة العامة";
 $e_payment_no = "987654321";
@@ -15,8 +15,9 @@ $payments = [
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>الدفع الإلكتروني</title>
+    <title>الدفع الإلكتروني - نظام ضريبة المبيعات</title>
     <style>
+        /* الإعدادات العامة للصفحة */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: #f4f4f4;
@@ -28,53 +29,55 @@ $payments = [
             min-height: 100vh;
         }
 
+        /* الحاوية الرئيسية - تم تصغير العرض ليكون متناسقاً */
         .window-container {
             background-color: #ffffff;
-            width: 95%;
-            max-width: 1400px;
+            width: 85%; /* العرض المصغر */
+            max-width: 1100px; /* الحد الأقصى المتناسق */
             min-height: 90vh;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
             position: relative;
             display: flex;
             flex-direction: column;
             border: 1px solid #ccc;
+            overflow: hidden;
         }
 
-        /* الهيدر */
+        /* الهيدر الموحد - يغطي كامل العرض من الأعلى */
         .header-banner {
             width: 100%;
-            height: 100px;
+            height: 120px; 
             background-color: #ffffff;
-            border-bottom: 6px solid #3b71ca;
+            border-bottom: 6px solid #4873c4; /* الخط الأزرق الفاصل */
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            padding: 0 40px;
-            box-sizing: border-box;
+            justify-content: center;
+            margin: 0;
+            padding: 0;
         }
 
-        .header-logo {
-            text-align: right;
-            font-size: 18px;
-            font-weight: bold;
-            color: #b31b1b;
+        .header-banner img {
+            width: 100%;
+            height: 100%;
+            object-fit: fill; /* تمطيط الصورة لتغطي العرض بالكامل */
         }
 
+        /* العناوين */
         .page-title {
             text-align: center;
-            font-size: 32px;
+            font-size: 28px;
             font-weight: bold;
-            margin: 30px 0;
+            margin: 25px 0;
             color: #000;
         }
 
-        /* الشبكة العلوية للحقول */
+        /* شبكة المعلومات العلوية */
         .top-info-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-            padding: 0 80px;
-            margin-bottom: 30px;
+            gap: 15px;
+            padding: 0 50px;
+            margin-bottom: 25px;
         }
 
         .input-group {
@@ -86,15 +89,16 @@ $payments = [
 
         .input-group label {
             font-weight: bold;
-            font-size: 18px;
+            font-size: 16px;
         }
 
         .input-group input {
-            width: 250px;
+            width: 220px;
             padding: 10px;
             border: 1px solid #7a7a7a;
             text-align: center;
-            font-size: 16px;
+            font-size: 15px;
+            background-color: #f9f9f9;
         }
 
         /* صف آلية الدفع */
@@ -102,8 +106,8 @@ $payments = [
             display: flex;
             justify-content: center;
             align-items: center;
-            gap: 20px;
-            margin-bottom: 30px;
+            gap: 15px;
+            margin-bottom: 20px;
         }
 
         .btn-pdf {
@@ -113,19 +117,22 @@ $payments = [
             padding: 8px 20px;
             font-weight: bold;
             cursor: pointer;
+            border-radius: 4px;
         }
 
-        /* قسم الجدول */
         .section-label {
             text-align: center;
             font-weight: bold;
-            font-size: 22px;
-            margin: 20px 0 10px 0;
+            font-size: 20px;
+            margin: 15px 0;
+            text-decoration: underline;
         }
 
+        /* تنسيق الجدول */
         .table-container {
-            padding: 0 80px;
-            margin-bottom: 40px;
+            padding: 0 50px;
+            margin-bottom: 30px;
+            flex-grow: 1;
         }
 
         table {
@@ -140,14 +147,14 @@ $payments = [
             text-align: center;
         }
 
-        th { background-color: #f9f9f9; color: #666; font-size: 18px; }
+        th { background-color: #f0f0f0; color: #333; font-size: 16px; }
 
-        /* حقول الأقساط السفلية */
+        /* حقول الأقساط */
         .bottom-info-grid {
             display: flex;
             justify-content: center;
-            gap: 100px;
-            margin-bottom: 40px;
+            gap: 60px;
+            margin-bottom: 30px;
         }
 
         .field-with-icon {
@@ -160,43 +167,53 @@ $payments = [
             background-color: #4873c4;
             color: white;
             border: none;
-            width: 35px;
-            height: 35px;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
             font-weight: bold;
             cursor: help;
         }
 
-        /* الأزرار الجانبية والسفلية */
+        /* زر AI العائم */
         .ai-btn {
             position: absolute;
-            left: 0;
+            left: 20px;
             top: 50%;
             transform: translateY(-50%);
             background-color: #4873c4;
             color: white;
             border: none;
-            width: 60px;
-            height: 60px;
+            width: 55px;
+            height: 55px;
+            border-radius: 5px;
             font-weight: bold;
-            font-size: 20px;
+            font-size: 18px;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
         }
 
+        /* أزرار التحكم السفلية */
         .footer-actions {
             display: flex;
             justify-content: center;
-            gap: 40px;
-            padding-bottom: 40px;
+            gap: 30px;
+            padding-bottom: 30px;
         }
 
         .action-btn {
             background-color: #4873c4;
             color: white;
             border: none;
-            width: 150px;
-            padding: 12px;
-            font-size: 18px;
+            width: 130px;
+            padding: 10px;
+            font-size: 16px;
             font-weight: bold;
             cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .action-btn:hover {
+            background-color: #365a9e;
         }
     </style>
 </head>
@@ -204,37 +221,33 @@ $payments = [
 
     <div class="window-container">
         <div class="header-banner">
-            <div style="font-size: 14px;">بوابة الدفع الضريبي</div>
-            <div class="header-logo">
-                المملكة الأردنية الهاشمية<br>وزارة المالية<br>دائرة ضريبة الدخل والمبيعات
-            </div>
+            <img src="photo.jpeg" alt="شعار دائرة ضريبة الدخل والمبيعات">
         </div>
 
-        <button class="ai-btn">AI</button>
 
-        <div class="page-title">الدفع الالكتروني</div>
+        <div class="page-title">الدفع الإلكتروني</div>
 
         <div class="top-info-grid">
             <div class="input-group">
-                <label>رقم الدفع الالكتروني</label>
-                <input type="text" value="<?= $e_payment_no ?>" readonly>
+                <label>رقم الدفع الإلكتروني</label>
+                <input type="text" value="<?= htmlspecialchars($e_payment_no) ?>" readonly>
             </div>
             <div class="input-group">
                 <label>اسم المكلف</label>
-                <input type="text" value="<?= $taxpayer_name ?>" readonly>
+                <input type="text" value="<?= htmlspecialchars($taxpayer_name) ?>" readonly>
             </div>
             <div class="input-group">
                 <label>رقم المكلف</label>
-                <input type="text" value="<?= $taxpayer_number ?>" readonly>
+                <input type="text" value="<?= htmlspecialchars($taxpayer_number) ?>" readonly>
             </div>
         </div>
 
         <div class="payment-method-row">
             <button class="btn-pdf">PDF آلية الدفع</button>
-            <label style="font-weight: bold; font-size: 18px;">آلية الدفع الالكتروني</label>
+            <label style="font-weight: bold;">آلية الدفع الإلكتروني</label>
         </div>
 
-        <div class="section-label">امر قبض</div>
+        <div class="section-label">أمر قبض</div>
 
         <div class="table-container">
             <table>
@@ -249,14 +262,14 @@ $payments = [
                 <tbody>
                     <?php foreach($payments as $p): ?>
                     <tr>
-                        <td><?= $p['desc'] ?></td>
-                        <td><?= $p['year'] ?></td>
-                        <td><?= $p['period'] ?></td>
-                        <td><?= $p['amount'] ?></td>
+                        <td><?= htmlspecialchars($p['desc']) ?></td>
+                        <td><?= htmlspecialchars($p['year']) ?></td>
+                        <td><?= htmlspecialchars($p['period']) ?></td>
+                        <td><?= htmlspecialchars($p['amount']) ?></td>
                     </tr>
                     <?php endforeach; ?>
-                    <tr><td style="height: 40px;"></td><td></td><td></td><td></td></tr>
-                    <tr><td style="height: 40px;"></td><td></td><td></td><td></td></tr>
+                    <tr><td style="height: 35px;"></td><td></td><td></td><td></td></tr>
+                    <tr><td style="height: 35px;"></td><td></td><td></td><td></td></tr>
                 </tbody>
             </table>
         </div>
@@ -265,19 +278,20 @@ $payments = [
             <div class="input-group">
                 <label>قيمة القسط</label>
                 <div class="field-with-icon">
-                    <button class="btn-info-circle" title="شرح حول قيمة القسط">!</button>
-                    <input type="text" placeholder="0.00">
+                    <button class="btn-info-circle" title="القيمة الشهرية للقسط">!</button>
+                    <input type="text" placeholder="0.00" style="width: 180px;">
                 </div>
             </div>
             <div class="input-group">
-                <label>عدد الاقساط</label>
-                <input type="text" placeholder="0">
+                <label>عدد الأقساط</label>
+                <input type="text" placeholder="0" style="width: 180px;">
             </div>
         </div>
 
         <div class="footer-actions">
             <button class="action-btn" onclick="window.location.href='mains.php'">خروج</button>
             <button class="action-btn" onclick="window.print()">طباعة</button>
+            
         </div>
     </div>
 

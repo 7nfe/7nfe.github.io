@@ -32,22 +32,23 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             padding-bottom: 50px;
         }
 
-        .header-banner {
-            width: 100%;
-            height: 80px;
-            background-color: #ffffff;
-            border-bottom: 4px solid #4873c4;
-            display: flex;
-            align-items: center;
-            padding: 0 20px;
-            box-sizing: border-box;
-        }
+     .header-banner {
+    width: 100%;
+    height: 100px; /* يمكنك زيادة الارتفاع حسب حجم الصورة */
+    background-color: #ffffff;
+    border-bottom: 6px solid #4873c4;
+    padding: 0; /* أزلنا الحشو الداخلي لتأخذ الصورة كامل المساحة إذا أردت */
+    overflow: hidden; /* لمنع خروج الصورة عن الإطار */
+    display: flex;
+    align-items: center;
+    justify-content: center; /* لتوسيط الصورة */
+}
 
-        .header-text {
-            font-weight: bold;
-            color: #4873c4;
-            line-height: 1.5;
-        }
+.header-image {
+    width: 200%; /* تجعل الصورة بعرض الهيدر */
+    height: 200%; /* تجعل الصورة بارتفاع الهيدر */
+    object-fit: contain; /* أهم خاصية: تحافظ على تناسق أبعاد الصورة دون تمطيطها */
+}
 
         .page-title {
             text-align: center;
@@ -192,9 +193,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <div class="main-container">
         
         <div class="header-banner">
-            <div class="header-text">
-                المملكة الأردنية الهاشمية<br>وزارة المالية<br>دائرة ضريبة الدخل والمبيعات
-            </div>
+              <div class="header-banner">
+    <img src="photo.jpeg" alt="شعار دائرة ضريبة الدخل والمبيعات" class="header-image">
+</div>
         </div>
 
         <div class="page-title">طلب تقسيط ضريبة المبيعات</div>

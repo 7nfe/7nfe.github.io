@@ -243,7 +243,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         <option value="صناعي">صناعي</option>
                         <option value="خدمي">خدمي</option>
                     </select>
-                </div>
+                </div>s
                 
 
             </div>
