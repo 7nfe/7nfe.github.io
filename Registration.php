@@ -1,9 +1,13 @@
 <?php
 // معالجة البيانات عند إرسال النموذج (Submit)
+$message = "";
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    // يمكنك هنا استلام البيانات مثل:
-    // $taxpayer_name = $_POST['taxpayer_name'];
-    // ثم حفظها في قاعدة بيانات النظام الضريبي الخاص بالعقبة
+    // استلام البيانات من النموذج
+    $taxpayer_name = $_POST['taxpayer_name'] ?? '';
+    $taxpayer_number = $_POST['taxpayer_number'] ?? '';
+    
+    // هنا يمكنك إضافة كود الحفظ في قاعدة البيانات
+    $message = "تم استلام طلب المكلف: " . htmlspecialchars($taxpayer_name);
 }
 ?>
 
@@ -12,148 +16,168 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>التسجيل في ضريبة المبيعات</title>
+    <title>التسجيل في ضريبة المبيعات - سلطة العقبة</title>
     <style>
         /* التنسيقات العامة */
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f0f2f5;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background-color: #f4f7f6;
             margin: 0;
-            padding: 0;
+            padding: 20px;
             display: flex;
             justify-content: center;
         }
 
         .main-container {
-            width: 95%;
-            max-width: 1100px;
+            width: 100%;
+            max-width: 1000px;
             background-color: #ffffff;
-            min-height: 100vh;
-            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border-radius: 8px;
+            overflow: hidden;
             padding-bottom: 40px;
         }
 
-        /* الترويسة */
+        /* تنسيق الهيدر والصورة */
         .header-banner {
             width: 100%;
-            height: 80px;
-            background-color: #ffffff;
-            border-bottom: 4px solid #4873c4;
+            height: 100px;
+            background-color: #fff;
             display: flex;
             align-items: center;
-            padding: 0 20px;
-            box-sizing: border-box;
+            justify-content: center;
+            padding: 10px 0;
+        }
+
+        .header-banner img {
+            max-height: 100%;
+            max-width: 100%;
+            object-fit: contain;
         }
 
         .page-title {
             text-align: center;
-            color: #000;
-            margin: 30px 0;
-            font-size: 26px;
+            color: #333;
+            margin: 25px 0;
+            font-size: 24px;
             font-weight: bold;
+            position: relative;
         }
 
-        /* شبكة الحقول (3 أعمدة) */
+        .page-title::after {
+            content: '';
+            display: block;
+            width: 50px;
+            height: 3px;
+            background: #4873c4;
+            margin: 8px auto;
+        }
+
+        /* شبكة الحقول */
         .form-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 25px 40px;
-            padding: 0 50px;
-            margin-bottom: 40px;
+            gap: 20px;
+            padding: 0 40px;
         }
 
-        /* تنسيق الحقول */
         .input-group {
             display: flex;
             flex-direction: column;
-            align-items: center;
-            gap: 8px;
+            gap: 5px;
         }
 
         .input-group label {
-            font-weight: bold;
-            font-size: 15px;
+            font-weight: 600;
+            font-size: 14px;
+            color: #555;
         }
 
-        .input-group input[type="text"],
-        .input-group input[type="email"],
-        .input-group input[type="date"],
+        .input-group input, 
         .input-group select {
-            width: 80%;
-            padding: 8px;
-            border: 1px solid #aaa;
-            text-align: center;
-            font-size: 14px;
-            box-sizing: border-box;
-        }
-
-        /* تنسيق أزرار الاختيار (Radio Buttons) داخل إطار */
-        .radio-fieldset {
-            border: 1px solid #ddd;
             padding: 10px;
-            width: 80%;
-            box-sizing: border-box;
-            display: flex;
-            justify-content: space-around;
+            border: 1px solid #ccc;
             border-radius: 4px;
+            font-size: 14px;
+            transition: border 0.3s;
         }
 
-        .radio-fieldset legend {
+        .input-group input:focus {
+            border-color: #4873c4;
+            outline: none;
+        }
+
+        /* تنسيق الـ Fieldset */
+        .full-width {
+            grid-column: span 3;
+            display: flex;
+            justify-content: center;
+            margin: 10px 0;
+        }
+
+        fieldset {
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 15px;
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            width: 100%;
+        }
+
+        legend {
             font-weight: bold;
             font-size: 14px;
-            text-align: center;
-            padding: 0 5px;
+            color: #4873c4;
+            padding: 0 10px;
         }
 
         .radio-option {
             display: flex;
             align-items: center;
             gap: 5px;
-            font-size: 14px;
-        }
-
-        /* حقل مع زر تعجب جانبي */
-        .input-with-btn {
-            display: flex;
-            width: 80%;
-            gap: 5px;
-        }
-
-        .input-with-btn input {
-            width: 100%;
-        }
-
-        .btn-info-small {
-            background-color: #4873c4;
-            color: white;
-            border: none;
-            width: 35px;
-            font-weight: bold;
-            font-size: 18px;
             cursor: pointer;
         }
 
-        /* أزرار الإجراءات السفلية */
+        /* أزرار الإجراءات */
         .action-buttons {
             display: flex;
             justify-content: center;
-            gap: 40px;
-            margin-top: 20px;
+            gap: 20px;
+            margin-top: 40px;
         }
 
         .btn-action {
-            background-color: #4873c4;
-            color: white;
-            border: none;
-            padding: 10px 50px;
-            font-size: 18px;
+            padding: 12px 40px;
+            font-size: 16px;
             font-weight: bold;
+            border: none;
+            border-radius: 4px;
             cursor: pointer;
             transition: 0.3s;
         }
 
-        .btn-action:hover {
-            background-color: #365a9e;
+        .btn-submit { background-color: #4873c4; color: white; }
+        .btn-submit:hover { background-color: #365a9e; }
+
+        .btn-cancel { background-color: #e74c3c; color: white; }
+        .btn-print { background-color: #2ecc71; color: white; }
+
+        .alert {
+            margin: 20px 40px;
+            padding: 15px;
+            background-color: #d4edda;
+            color: #155724;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        /* للموبايل */
+        @media (max-width: 768px) {
+            .form-grid { grid-template-columns: 1fr; }
+            .full-width { grid-column: span 1; }
+            .action-buttons { flex-direction: column; align-items: center; }
+            .btn-action { width: 80%; }
         }
     </style>
 </head>
@@ -161,40 +185,45 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     <div class="main-container">
         
+        <!-- الهيدر -->
         <div class="header-banner">
-            <div style="font-weight: bold; color: #4873c4; text-align: left; width: 100%;">
-                المملكة الأردنية الهاشمية<br>وزارة المالية<br>دائرة ضريبة الدخل والمبيعات
-            </div>
+            <!-- تأكد أن ملف الصورة photo.jpeg موجود في نفس المجلد -->
+            <img src="photo.jpeg" alt="شعار منطقة العقبة الاقتصادية الخاصة">
         </div>
 
-        <div class="page-title">التسجيل في ضريبة المبيعات</div>
+        <div class="page-title">نموذج التسجيل في ضريبة المبيعات</div>
+
+        <?php if ($message): ?>
+            <div class="alert"><?php echo $message; ?></div>
+        <?php endif; ?>
 
         <form method="POST" action="">
             <div class="form-grid">
                 
+                <!-- الصف الأول -->
                 <div class="input-group">
                     <label>رقم المكلف</label>
-                    <input type="text" name="taxpayer_number">
+                    <input type="text" name="taxpayer_number" required>
                 </div>
                 <div class="input-group">
                     <label>اسم المكلف</label>
-                    <input type="text" name="taxpayer_name">
+                    <input type="text" name="taxpayer_name" required>
                 </div>
                 <div class="input-group">
                     <label>رقم الهاتف</label>
                     <input type="text" name="phone">
                 </div>
 
-                <div></div>
-
-                <div class="input-group" style="grid-column: span 3;">
-                    <fieldset class="radio-fieldset" style="width: 70%;">
+                <!-- نوع الشخص الاعتباري -->
+                <div class="full-width">
+                    <fieldset>
                         <legend>نوع الشخص الاعتباري</legend>
-                        <div class="radio-option"><input type="radio" name="legal_entity_type" value="تضامن توصية بسيطة"> تضامن توصية بسيطة</div>
-                        <div class="radio-option"><input type="radio" name="legal_entity_type" value="ذات مسؤولية محدودة"> ذات مسؤولية محدودة</div>
+                        <label class="radio-option"><input type="radio" name="legal_entity_type" value="تضامن توصية بسيطة"> تضامن توصية بسيطة</label>
+                        <label class="radio-option"><input type="radio" name="legal_entity_type" value="ذات مسؤولية محدودة"> ذات مسؤولية محدودة</label>
                     </fieldset>
                 </div>
 
+                <!-- الصف الثالث -->
                 <div class="input-group">
                     <label>مديرية المكلف</label>
                     <input type="text" name="directorate">
@@ -208,6 +237,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     <input type="text" name="trade_name">
                 </div>
 
+                <!-- الصف الرابع -->
                 <div class="input-group">
                     <label>رقم السجل التجاري</label>
                     <input type="text" name="commercial_record">
@@ -221,41 +251,39 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     <input type="text" name="address">
                 </div>
 
+                <!-- الصف الخامس -->
                 <div class="input-group">
                     <label>الرقم الوطني للمنشأة</label>
                     <input type="text" name="facility_national_id">
                 </div>
                 
-                
-                <div></div> <div class="input-group">
-                    <fieldset class="radio-fieldset">
-                        <legend>نوع الطلب</legend>
-                        <div class="radio-option"><input type="radio" name="request_type" value="تسجيل" checked> تسجيل</div>
-                        <div class="radio-option"><input type="radio" name="request_type" value="إعادة تسجيل"> اعادة تسجيل</div>
-                    </fieldset>
-                </div>
-
                 <div class="input-group">
                     <label>طبيعة النشاط التجاري</label>
                     <select name="business_nature">
-                        <option value=""></option>
+                        <option value="">-- اختر --</option>
                         <option value="تجاري">تجاري</option>
                         <option value="صناعي">صناعي</option>
                         <option value="خدمي">خدمي</option>
                     </select>
-                </div>s
-                
+                </div>
+
+                <div class="input-group">
+                    <fieldset style="gap: 10px; padding: 5px 15px;">
+                        <legend>نوع الطلب</legend>
+                        <label class="radio-option"><input type="radio" name="request_type" value="تسجيل" checked> تسجيل</label>
+                        <label class="radio-option"><input type="radio" name="request_type" value="إعادة تسجيل"> إعادة</label>
+                    </fieldset>
+                </div>
 
             </div>
 
+            <!-- أزرار الإجراءات -->
             <div class="action-buttons">
-                <button type="submit" class="btn-action">تسجيل</button>
-                <button type="button" class="btn-action">إلغاء</button>
-                <button type="button" class="btn-action">طباعة</button>
+                <button type="submit" class="btn-action btn-submit">تسجيل البيانات</button>
+                <button type="button" class="btn-action btn-print" onclick="window.print()">طباعة النموذج</button>
+                <button type="reset" class="btn-action btn-cancel">إلغاء</button>
             </div>
-
         </form>
-
     </div>
 
 </body>
