@@ -9,6 +9,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     // هنا يمكنك إضافة كود الحفظ في قاعدة البيانات
     $message = "تم استلام طلب المكلف: " . htmlspecialchars($taxpayer_name);
 }
+include 'config.php';
+
+
+
 ?>
 
 <!DOCTYPE html>
@@ -197,7 +201,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <div class="alert"><?php echo $message; ?></div>
         <?php endif; ?>
 
-        <form method="POST" action="">
+        <form method="POST" action="insert_registration.php">
             <div class="form-grid">
                 
                 <!-- الصف الأول -->
@@ -270,9 +274,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <div class="input-group">
                     <fieldset style="gap: 10px; padding: 5px 15px;">
                         <legend>نوع الطلب</legend>
+
+
                         <label class="radio-option"><input type="radio" name="request_type" value="تسجيل" checked> تسجيل</label>
                         <label class="radio-option"><input type="radio" name="request_type" value="إعادة تسجيل"> إعادة</label>
                     </fieldset>
+                </div>
+                <div class="input-group">
+                    <label>الرمز </label>
+                    <input type="text" name="password">
                 </div>
 
             </div>

@@ -1,46 +1,41 @@
 <?php
-// إعداد متغيرات الرسائل والقيم الافتراضية المحاكية لجلب البيانات من قاعدة البيانات
-$message = "";
+// 1. بدء الجلسة والاتصال بقاعدة البيانات
+session_start();
+include("config.php"); 
 
-// القيم الثابتة للمكلف (يمكنك تغييرها هنا وسيتم تحديثها في كامل الصفحة)
-$fixed_tax_number = "123456789";
-$fixed_tax_name = "شركة العقبة للتجارة";
-
-$default_balance = 0.00; // الخانة 1: رصيد مدور
-$default_adj_reg = 0.00; // الخانة 4: حركة تعديل لصالح المسجل
-
-// معالجة البيانات عند إرسال النموذج
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    
-    // استقبال البيانات (استخدام القيم الثابتة بدلاً من القادمة من POST للأمان)
-    $tax_number = $fixed_tax_number;
-    $tax_name = $fixed_tax_name;
-    
-    $dec_type = $_POST['dec_type'] ?? '';
-    $year = $_POST['year'] ?? '';
-    $period = $_POST['period'] ?? '';
-    
-    // استقبال المدخلات المالية
-    $balance = floatval($_POST['balance'] ?? 0);     
-    $sales_7 = floatval($_POST['sales_7'] ?? 0);     
-    $adj_reg = floatval($_POST['adj_reg'] ?? 0);     
-    $adj_dep = floatval($_POST['adj_dep'] ?? 0);     
-
-    // العمليات الحسابية
-    $tax_subject = $sales_7 * 0.07; 
-    $result = $tax_subject - ($balance + $adj_reg) + $adj_dep;
-
-    if ($result > 0) {
-        $tax_due_pos = round($result, 3);
-        $tax_due_neg = 0;
-    } else {
-        $tax_due_pos = 0;
-        $tax_due_neg = round(abs($result), 3);
-    }
-
-    // رسالة نجاح مؤقتة
-    $message = "<div class='alert success'>تم معالجة الإقرار بنجاح للمكلف: " . htmlspecialchars($tax_name) . "! الضريبة المستحقة: $tax_due_pos</div>";
+// 2. التحقق من أن المستخدم سجل دخوله مسبقاً
+if (!isset($_SESSION['taxpayer_id'])) {
+    header("Location: login.php");
+    exit();
 }
+
+// 3. جلب بيانات المكلف الحقيقية من قاعدة البيانات
+$session_id = $_SESSION['taxpayer_id'];
+$tax_number = "";
+$tax_name = "";
+
+$stmt = $conn->prepare("SELECT taxpayer_id, taxpayer_name FROM taxpayers WHERE taxpayer_id = ?");
+$stmt->bind_param("s", $session_id);
+$stmt->execute();
+$result = $stmt->get_result();
+
+if ($row = $result->fetch_assoc()) {
+    $tax_number = $row['taxpayer_id'];
+    $tax_name   = $row['taxpayer_name'];
+} else {
+    // احتياطياً إذا لم توجد بيانات
+    $tax_number = $session_id;
+    $tax_name   = "مكلف غير معروف";
+}
+$stmt->close();
+
+// إعداد متغيرات الرسائل والقيم الافتراضية
+$message = "";
+$default_balance = 0.00; // يمكن لاحقاً جلبها من جدول الإقرارات السابقة
+$default_adj_reg = 0.00; 
+
+// معالجة البيانات عند إرسال النموذج (insert_taxreturn.php)
+// ملاحظة: يفضل أن تكون عملية الإدخال في ملف منفصل كما هو محدد في الـ Action الخاص بالفورم
 ?>
 
 <!DOCTYPE html>
@@ -90,7 +85,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             width: 250px; padding: 8px; border: 1px solid #999; margin: 0 15px; text-align: center; border-radius: 4px;
         }
         
-        /* تمييز الحقول التلقائية والثابتة للقراءة فقط */
         .readonly-field { 
             background-color: #e9ecef; 
             cursor: not-allowed; 
@@ -107,7 +101,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             background-color: #4169E1; color: white; border: none; padding: 10px 40px; font-size: 16px; font-weight: bold; cursor: pointer; border-radius: 4px; transition: 0.3s;
         }
         .action-buttons button:hover, .btn-info:hover { background-color: #2b4cad; }
-        .alert.success { background-color: #d4edda; color: #155724; padding: 15px; text-align: center; margin: 10px 50px; border: 1px solid #c3e6cb; border-radius: 4px; }
     </style>
 </head>
 <body>
@@ -117,22 +110,20 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         <img src="photo.jpeg" alt="شعار الدائرة">
     </div>
 
-    <?php if(!empty($message)) echo $message; ?>
-
     <h2 class="title">إقرار ضريبة المبيعات</h2>
 
-    <form method="POST" action="">
+    <form method="POST" action="insert_taxreturn.php">
         
         <div class="top-row">
             <div class="input-group">
                 <label>رقم المكلف</label>
-                <!-- قيمة ثابتة للقراءة فقط -->
-                <input type="text" name="tax_number" value="<?php echo $fixed_tax_number; ?>" readonly class="readonly-field">
+                <!-- جلب القيمة من المتغير القادم من قاعدة البيانات -->
+                <input type="text" name="tax_number" value="<?php echo htmlspecialchars($tax_number); ?>" readonly class="readonly-field">
             </div>
             <div class="input-group">
                 <label>اسم المكلف</label>
-                <!-- قيمة ثابتة للقراءة فقط -->
-                <input type="text" name="tax_name" value="<?php echo $fixed_tax_name; ?>" readonly class="readonly-field">
+                <!-- جلب القيمة من المتغير القادم من قاعدة البيانات -->
+                <input type="text" name="tax_name" value="<?php echo htmlspecialchars($tax_name); ?>" readonly class="readonly-field">
             </div>
         </div>
 
@@ -141,25 +132,19 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <label>نوع الإقرار</label>
                 <select name="dec_type">
                     <option value="أصلي">أصلي</option>
+      
                 </select>
             </div>
-            <div class="input-group">
-                <label>السنة</label>
-                <select name="year">
-                    <option value="2026">2026</option>
-                    <option value="2025">2025</option>
-                    <option value="2024">2024</option>
-                </select>
-            </div>
+           
             <div class="input-group">
                 <label>الفترة</label>
                 <select name="period">
-                    <option value="1">1+2</option>
-                    <option value="2">3+4</option>
-                    <option value="3">5+6</option>
-                    <option value="4">7+8</option>
-                    <option value="5">9+10</option>
-                    <option value="6">11+12</option>
+                    <option value="1+2/2026">1+2/2026</option>
+                    <option value="3+4/2026">3+4/2026</option>
+                    <option value="5+6/2026">5+6/2026</option>
+                    <option value="7+8/2026">7+8/2026</option>
+                    <option value="9+10/2026">9+10/2026</option>
+                    <option value="11+12/2026">11+12/2026</option>
                 </select>
             </div>
         </div>
@@ -198,15 +183,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 </div>
 
                 <div class="finance-row">
-                    <label>الخانة (6): الضريبة المستحقة موجبة<br>(مبلغ واجب دفعه)</label>
+                    <label>الخانة (6): الضريبة المستحقة موجبة (دفع)</label>
                     <input type="number" step="0.01" id="tax_due_pos" name="tax_due_pos" readonly class="readonly-field">
-                    <button type="button" class="btn-info" title="تُحسب تلقائياً إذا كان الناتج أكبر من صفر">!</button>
+                    <button type="button" class="btn-info" title="تُحسب تلقائياً">!</button>
                 </div>
 
                 <div class="finance-row">
-                    <label>الخانة (7): الضريبة المستحقة سالبة<br>(مدور لصالحك الفترة القادمة)</label>
+                    <label>الخانة (7): الضريبة المستحقة سالبة (مدور)</label>
                     <input type="number" step="0.01" id="tax_due_neg" name="tax_due_neg" readonly class="readonly-field">
-                    <button type="button" class="btn-info" title="تُحسب تلقائياً إذا كان الناتج أقل من أو يساوي صفر">!</button>
+                    <button type="button" class="btn-info" title="تُحسب تلقائياً">!</button>
                 </div>
 
             </div>
@@ -215,7 +200,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         <div class="action-buttons">
             <button type="submit">إرسال الإقرار</button>
             <button type="button" onclick="window.location.href='mains.php'">إلغاء</button>
-            <button type="button" onclick="window.print()">طباعة التقرير (PDF)</button>
+            <button type="button" onclick="window.print()">طباعة (PDF)</button>
         </div>
 
     </form>
@@ -241,7 +226,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             document.getElementById('tax_due_neg').value = Math.abs(result).toFixed(3);
         }
     }
-
     window.onload = calculateTax;
 </script>
 
