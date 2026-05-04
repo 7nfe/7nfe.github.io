@@ -1,24 +1,42 @@
 <?php
+// 1. بدء الجلسة والاتصال بقاعدة البيانات
 session_start();
+include("config.php"); 
 
-// التحقق مما إذا تم إرسال النموذج
+$error_message = "";
+
+// 2. معالجة بيانات نموذج تسجيل الدخول
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $username = $_POST['username'] ?? '';
-    $password = $_POST['password'] ?? '';
+    $username = trim($_POST['username'] ?? ''); // يمثل رقم المكلف
+    $password = trim($_POST['password'] ?? '');
 
-    // محاكاة التحقق من قاعدة البيانات (يجب استبدالها لاحقاً باستعلام MySQL حقيقي)
-    // هنا نفترض أن تسجيل الدخول ناجح دائماً لغايات التجربة
     if (!empty($username) && !empty($password)) {
         
-        // حفظ بيانات المكلف في الجلسة (Session) لاستخدامها في باقي الشاشات
-        $_SESSION['taxpayer_number'] = $username; // يمكن استبداله بالرقم الفعلي من قاعدة البيانات
-        $_SESSION['taxpayer_name'] = "شركة العقبة للتجارة العامة"; // اسم افتراضي
+        // التعديل: البحث في جدول taxpayers باستخدام رقم المكلف
+        $stmt = $conn->prepare("SELECT taxpayer_id, password FROM taxpayers WHERE taxpayer_id = ?");
+        $stmt->bind_param("i", $username);
+        $stmt->execute();
+        $result = $stmt->get_result();
 
-        // التوجيه إلى الشاشة الرئيسية
-        header("Location: mains.php");
-        exit();
+        if ($result->num_rows === 1) {
+            $row = $result->fetch_assoc();
+            
+            // التحقق من كلمة المرور المشفرة (password_verify) 
+            // مع دعم النص المجرد فقط إذا كنت قد أدخلت بيانات يدوية قديمة للتجربة
+            if (password_verify($password, $row['password']) || $password === $row['password']) {
+                
+                $_SESSION['taxpayer_id'] = $row['taxpayer_id'];
+                header("Location: mains.php");
+                exit();
+            } else {
+                $error_message = "كلمة المرور غير صحيحة.";
+            }
+        } else {
+            $error_message = "رقم المكلف غير موجود في النظام.";
+        }
+        $stmt->close();
     } else {
-        $error_message = "يرجى إدخال اسم المستخدم وكلمة المرور.";
+        $error_message = "يرجى إدخال رقم المكلف وكلمة المرور.";
     }
 }
 ?>
@@ -42,7 +60,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             height: 100vh;
         }
 
-        /* الترويسة العلوية المطابقة للنظام */
         .header-banner {
             width: 100%;
             height: 80px;
@@ -58,12 +75,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         .header-text {
             font-weight: bold;
             color: #4873c4;
-            text-align: left;
+            text-align: right;
             width: 100%;
             line-height: 1.5;
+            font-size: 14px;
         }
 
-        /* حاوية تسجيل الدخول لتوسيط المربع */
         .login-container {
             flex-grow: 1;
             display: flex;
@@ -72,14 +89,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             width: 100%;
         }
 
-        /* مربع تسجيل الدخول (Card) */
         .login-box {
             background-color: #ffffff;
-            width: 400px;
+            width: 90%;
+            max-width: 400px;
             padding: 40px 30px;
-            border: 1px solid #777;
+            border: 1px solid #ccc;
             text-align: center;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
         }
 
         .login-title {
@@ -89,7 +106,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             margin-bottom: 40px;
         }
 
-        /* تنسيق مجموعات الإدخال */
         .input-group {
             margin-bottom: 30px;
             text-align: right;
@@ -99,16 +115,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             display: block;
             font-weight: bold;
             margin-bottom: 10px;
-            color: #000;
+            color: #333;
         }
 
-        /* تنسيق الحقول لتكون بخط سفلي فقط كما في الصورة */
-        .input-group input[type="text"],
-        .input-group input[type="password"] {
+        .input-group input {
             width: 100%;
             border: none;
             border-bottom: 1px solid #777;
-            padding: 5px 0;
+            padding: 8px 0;
             font-size: 16px;
             outline: none;
             background-color: transparent;
@@ -119,17 +133,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             border-bottom: 2px solid #4873c4;
         }
 
-        /* تنسيق مربع اختيار "إظهار كلمة المرور" */
         .checkbox-group {
             display: flex;
             align-items: center;
-            justify-content: center;
+            justify-content: flex-start;
             gap: 10px;
             margin-bottom: 30px;
             font-size: 14px;
         }
 
-        /* زر تسجيل الدخول */
         .btn-login {
             background-color: #4873c4;
             color: white;
@@ -146,11 +158,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             background-color: #365a9e;
         }
 
-        /* رسالة الخطأ */
         .error-message {
-            color: red;
-            margin-bottom: 15px;
+            background-color: #ffebee;
+            color: #c62828;
+            padding: 10px;
+            margin-bottom: 20px;
             font-size: 14px;
+            border-right: 5px solid #c62828;
+            text-align: right;
         }
     </style>
 </head>
@@ -166,29 +181,32 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         <div class="login-box">
             <div class="login-title">تسجيل الدخول</div>
 
-            <?php if (isset($error_message)): ?>
+            <?php if (!empty($error_message)): ?>
                 <div class="error-message"><?php echo $error_message; ?></div>
             <?php endif; ?>
 
-            <form method="POST" action="">
+            <form method="POST" action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>">
                 
                 <div class="input-group">
-                    <label>اسم المستخدم</label>
-                    <input type="text" name="username" required>
+                    <label>اسم المستخدم (رقم المكلف)</label>
+                    <input type="text" name="username" required autocomplete="username">
                 </div>
 
                 <div class="input-group">
-                    <label>كلمة المرور</label>
-                    <input type="password" name="password" id="passwordInput" required>
+                    <label>الرمز (كلمة المرور)</label>
+                    <input type="password" name="password" id="passwordInput" required autocomplete="current-password">
                 </div>
 
                 <div class="checkbox-group">
                     <input type="checkbox" id="showPassword" onclick="togglePassword()">
-                    <label for="showPassword" style="margin: 0; cursor: pointer;">إظهار كلمة المرور</label>
+                    <label for="showPassword" style="cursor: pointer;">إظهار الرمز</label>
                 </div>
 
-                <button type="submit" class="btn-login">تسجيل الدخول</button>
+                <button type="submit" class="btn-login">دخول</button>
                 
+                <div style="margin-top: 20px; font-size: 14px;">
+                    <a href="registration.php" style="color: #4873c4; text-decoration: none;">ليس لديك حساب؟ سجل الآن</a>
+                </div>
             </form>
         </div>
     </div>

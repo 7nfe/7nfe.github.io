@@ -1,7 +1,37 @@
 <?php
-// محاكاة لبيانات قادمة من قاعدة البيانات أو الـ Session بعد تسجيل الدخول
-$taxpayer_number = "123456789"; 
-$taxpayer_name = "شركة العقبة للتجارة العامة"; 
+// 1. بدء الجلسة والاتصال بقاعدة البيانات
+session_start();
+include("config.php"); 
+
+// 2. التحقق من أن المستخدم سجل دخوله مسبقاً
+// إذا لم تكن الجلسة تحتوي على رقم مكلف، يتم توجيهه لصفحة الدخول
+if (!isset($_SESSION['taxpayer_id'])) {
+    header("Location: login.php");
+    exit();
+}
+
+// الحصول على رقم المكلف من الجلسة
+$session_id = $_SESSION['taxpayer_id'];
+
+// 3. جلب بيانات المكلف من قاعدة البيانات
+$taxpayer_number = "";
+$taxpayer_name = "";
+
+$stmt = $conn->prepare("SELECT taxpayer_id, taxpayer_name FROM taxpayers WHERE taxpayer_id = ?");
+$stmt->bind_param("s", $session_id);
+$stmt->execute();
+$result = $stmt->get_result();
+
+if ($row = $result->fetch_assoc()) {
+    $taxpayer_number = $row['taxpayer_id'];
+    $taxpayer_name   = $row['taxpayer_name'];
+} else {
+    // في حال حدث خطأ أو لم يتم العثور على البيانات
+    $taxpayer_number = $session_id;
+    $taxpayer_name   = "مكلف غير معروف";
+}
+
+$stmt->close();
 ?>
 
 <!DOCTYPE html>
@@ -10,193 +40,27 @@ $taxpayer_name = "شركة العقبة للتجارة العامة";
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>الشاشة الرئيسية - ضريبة المبيعات</title>
-    <style>
-        /* التنسيقات العامة */
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f0f2f5;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-        }
-
-        .main-container {
-            width: 90%;
-            max-width: 1200px;
-            background-color: #ffffff;
-            min-height: 100vh;
-            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
-            position: relative;
-            padding-bottom: 50px;
-        }
-
-        /* ترويسة الشعار (يمكنك استبدال مسار الصورة بصورة الشعار الحقيقي) */
-        .header-banner {
-            width: 100%;
-            height: 80px;
-            background-color: #ffffff;
-            border-bottom: 4px solid #4873c4; /* الخط الأزرق تحت الترويسة */
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 20px;
-            box-sizing: border-box;
-        }
-
-        /* عنوان الشاشة */
-        .page-title {
-            text-align: center;
-            color: #000;
-            margin: 30px 0;
-            font-size: 28px;
-            font-weight: bold;
-        }
-
-        /* الشريط الملاحي الأزرق */
-        .navbar {
-            background-color: #4873c4;
-            display: flex;
-            justify-content: space-around;
-            padding: 15px 0;
-            margin: 0 40px;
-        }
-
-        .navbar a {
-            color: white;
-            text-decoration: none;
-            font-weight: bold;
-            font-size: 16px;
-        }
-
-        .navbar a:hover {
-            text-decoration: underline;
-        }
-
-        /* قسم بيانات المكلف */
-        .taxpayer-info {
-            display: flex;
-            justify-content: center;
-            gap: 100px;
-            margin: 40px 0;
-        }
-
-        .input-group {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .input-group label {
-            font-weight: bold;
-            font-size: 16px;
-        }
-
-        .input-group input {
-            padding: 8px 10px;
-            border: 1px solid #777;
-            width: 250px;
-            font-size: 16px;
-            background-color: #fafafa;
-        }
-
-        /* شبكة الأزرار (اللفائف) */
-        .cards-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 40px;
-            padding: 0 100px;
-            margin-top: 50px;
-        }
-
-        .scroll-card {
-            background: #ffffff;
-            border: 1px solid #ccc;
-            border-radius: 10px;
-            padding: 40px 20px;
-            text-align: center;
-            font-size: 22px;
-            font-weight: bold;
-            color: #000;
-            cursor: pointer;
-            text-decoration: none;
-            position: relative;
-            box-shadow: inset 0px 0px 15px rgba(0,0,0,0.05), 0 5px 10px rgba(0,0,0,0.1);
-            transition: all 0.3s ease;
-        }
-
-        /* محاكاة شكل اللفافة (طيات الورق) من الأعلى والأسفل */
-        .scroll-card::before {
-            content: '';
-            position: absolute;
-            top: -10px; left: 5%; right: 5%;
-            height: 20px;
-            background: linear-gradient(to bottom, #e0e0e0, #ffffff);
-            border-radius: 50%;
-            border: 1px solid #ccc;
-            border-bottom: none;
-        }
-
-        .scroll-card::after {
-            content: '';
-            position: absolute;
-            bottom: -10px; left: 5%; right: 5%;
-            height: 20px;
-            background: linear-gradient(to top, #e0e0e0, #ffffff);
-            border-radius: 50%;
-            border: 1px solid #ccc;
-            border-top: none;
-        }
-
-        .scroll-card:hover {
-            transform: translateY(-5px);
-            box-shadow: inset 0px 0px 15px rgba(0,0,0,0.05), 0 10px 15px rgba(0,0,0,0.2);
-            border-color: #4873c4;
-            color: #4873c4;
-        }
-
-        /* زر الذكاء الاصطناعي */
-        .ai-button {
-            position: absolute;
-            left: 40px;
-            bottom: 100px;
-            background-color: #4873c4;
-            color: white;
-            border: none;
-            width: 70px;
-            height: 70px;
-            font-size: 24px;
-            font-weight: bold;
-            cursor: pointer;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .ai-button:hover {
-            background-color: #365a9e;
-        }
-    </style>
+    
+    <link rel="stylesheet" href="stylemain.css">
 </head>
 <body>
 
-    <div class="main-container">
+    <div class="main-app-container">
         
         <div class="header-banner">
-            <div style="font-weight: bold; color: #4873c4;">المملكة الأردنية الهاشمية<br>وزارة المالية<br>دائرة ضريبة الدخل والمبيعات</div>
+            <img src="photo.jpeg" alt="شعار دائرة ضريبة الدخل والمبيعات" class="header-image">
         </div>
 
         <div class="page-title">الشاشة الرئيسية</div>
 
         <div class="navbar">
-            <a href="my_requests.php">طلباتي</a>
+            <a href="myrequests.php">طلباتي</a>
             <a href="personal_data.php">البيانات الشخصية</a>
             <a href="internal_services.php">الخدمات الداخلية</a>
-            <a href="electronic_number.php">الرقم الإلكتروني</a>
+            <a href="payment.php">الدفع الإلكتروني</a>
         </div>
 
-        <div class="taxpayer-info">
+        <div class="taxpayer-info-section">
             <div class="input-group">
                 <label>رقم المكلف</label>
                 <input type="text" value="<?php echo htmlspecialchars($taxpayer_number); ?>" readonly>
@@ -208,13 +72,13 @@ $taxpayer_name = "شركة العقبة للتجارة العامة";
         </div>
 
         <div class="cards-grid">
-    <a href="taxreturn.php" class="scroll-card">إقرار ضريبة المبيعات</a>
-    <a href="installment.php" class="scroll-card">طلب تقسيط ضريبة المبيعات</a>
-    <a href="amend_return.php" class="scroll-card">طلب تعديل إقرار مبيعات</a>
-    <a href="cancel.php" class="scroll-card">إلغاء تسجيل مكلف</a>
-</div>
+            <a href="taxreturn.php" class="scroll-card">إقرار ضريبة المبيعات</a>
+            <a href="installment.php" class="scroll-card">طلب تقسيط ضريبة المبيعات</a>
+            <a href="amendment.php" class="scroll-card">طلب تعديل إقرار مبيعات</a>
+            <a href="cancel.php" class="scroll-card">إلغاء تسجيل مكلف</a>
+        </div>
 
-        <button class="ai-button">Ai</button>
+        <button class="btn-ai-float">Ai</button>
 
     </div>
 

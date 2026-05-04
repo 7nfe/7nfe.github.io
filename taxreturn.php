@@ -1,7 +1,41 @@
 <?php
-// محاكاة لبيانات المكلف التي تأتي من قاعدة البيانات
-$taxpayer_number = "123456789"; 
-$taxpayer_name = "شركة العقبة للتجارة العامة"; 
+// 1. بدء الجلسة والاتصال بقاعدة البيانات
+session_start();
+include("config.php"); 
+
+// 2. التحقق من أن المستخدم سجل دخوله مسبقاً
+if (!isset($_SESSION['taxpayer_id'])) {
+    header("Location: login.php");
+    exit();
+}
+
+// 3. جلب بيانات المكلف الحقيقية من قاعدة البيانات
+$session_id = $_SESSION['taxpayer_id'];
+$tax_number = "";
+$tax_name = "";
+
+$stmt = $conn->prepare("SELECT taxpayer_id, taxpayer_name FROM taxpayers WHERE taxpayer_id = ?");
+$stmt->bind_param("s", $session_id);
+$stmt->execute();
+$result = $stmt->get_result();
+
+if ($row = $result->fetch_assoc()) {
+    $tax_number = $row['taxpayer_id'];
+    $tax_name   = $row['taxpayer_name'];
+} else {
+    // احتياطياً إذا لم توجد بيانات
+    $tax_number = $session_id;
+    $tax_name   = "مكلف غير معروف";
+}
+$stmt->close();
+
+// إعداد متغيرات الرسائل والقيم الافتراضية
+$message = "";
+$default_balance = 0.00; // يمكن لاحقاً جلبها من جدول الإقرارات السابقة
+$default_adj_reg = 0.00; 
+
+// معالجة البيانات عند إرسال النموذج (insert_taxreturn.php)
+// ملاحظة: يفضل أن تكون عملية الإدخال في ملف منفصل كما هو محدد في الـ Action الخاص بالفورم
 ?>
 
 <!DOCTYPE html>
@@ -11,278 +45,190 @@ $taxpayer_name = "شركة العقبة للتجارة العامة";
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>إقرار ضريبة المبيعات</title>
     <style>
-        /* التنسيقات العامة */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f0f2f5;
+            background-color: #f4f4f4;
             margin: 0;
-            padding: 0;
+            padding: 20px;
             display: flex;
             justify-content: center;
         }
-
-        .main-container {
-            width: 90%;
-            max-width: 1000px;
+        .container {
             background-color: #ffffff;
-            min-height: 100vh;
-            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
-            position: relative;
+            width: 900px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.1);
+            border: 1px solid #ccc;
             padding-bottom: 30px;
         }
-
-        /* الترويسة */
-        .header-banner {
-            width: 100%;
-            height: 80px;
-            background-color: #ffffff;
-            border-bottom: 4px solid #4873c4;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0 20px;
-            box-sizing: border-box;
+        
+        .header-banner { width: 100%; height: 100px; background-color: #ffffff;
+            display: flex; align-items: center; justify-content: center; overflow: hidden;
+            border-bottom: 4px solid #4169E1;
         }
-
-        .page-title {
-            text-align: center;
-            color: #000;
-            margin: 30px 0;
-            font-size: 26px;
-            font-weight: bold;
+        .header-banner img { height: 90%; object-fit: contain; }
+        h2.title {
+            text-align: center; margin: 20px 0 40px 0; color: #111; font-size: 24px;
         }
-
-        /* تخطيط الصفوف العلوية (رقم المكلف، القوائم المنسدلة) */
-        .top-section {
-            padding: 0 50px;
-            margin-bottom: 30px;
-        }
-
-        .flex-row {
-            display: flex;
-            justify-content: space-around;
-            margin-bottom: 20px;
-        }
-
-        .input-group {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .input-group label {
-            font-weight: bold;
-            font-size: 15px;
-        }
-
+        .top-row { display: flex; justify-content: space-around; margin-bottom: 20px; padding: 0 50px; }
+        .input-group { display: flex; flex-direction: column; align-items: center; width: 45%; }
+        .input-group label { font-weight: bold; margin-bottom: 8px; font-size: 14px; }
         .input-group input, .input-group select {
-            padding: 6px 10px;
-            border: 1px solid #aaa;
-            width: 200px;
-            text-align: center;
-            font-size: 15px;
+            width: 100%; padding: 8px; border: 1px solid #999; text-align: center; border-radius: 4px;
         }
-
-        /* قسم الحقول المالية المتراصة */
-        .finance-section {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 15px;
-            margin-top: 20px;
-        }
-
-        .finance-row {
-            display: flex;
-            align-items: center;
-            justify-content: flex-start;
-            width: 600px; /* تحديد عرض ثابت لضمان المحاذاة */
-        }
-
-        .finance-row label {
-            width: 300px;
-            font-weight: bold;
-            font-size: 14px;
-            text-align: right;
-        }
-
+        .middle-row { display: flex; justify-content: space-between; margin-bottom: 40px; padding: 0 50px; }
+        .middle-row .input-group { width: 30%; }
+        .main-content { display: flex; position: relative; padding: 0 50px; justify-content: center; }
+        
+        .finance-list { width: 100%; display: flex; flex-direction: column; gap: 12px; }
+        .finance-row { display: flex; align-items: center; justify-content: flex-end; }
+        .finance-row label { width: 40%; text-align: right; font-weight: bold; font-size: 13px; }
         .finance-row input {
-            width: 200px;
-            padding: 8px;
-            border: 1px solid #aaa;
-            text-align: left; /* الأرقام تكتب من اليسار */
-            direction: ltr;
+            width: 250px; padding: 8px; border: 1px solid #999; margin: 0 15px; text-align: center; border-radius: 4px;
         }
-
-        /* زر التعجب الأزرق الصغير */
-        .btn-info-small {
-            background-color: #4873c4;
-            color: white;
-            border: none;
-            width: 35px;
-            height: 35px;
-            margin-right: 15px;
-            font-weight: bold;
-            font-size: 18px;
-            cursor: pointer;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+        
+        .readonly-field { 
+            background-color: #e9ecef; 
+            cursor: not-allowed; 
+            font-weight: bold; 
+            color: #555;
+            border-color: #ddd;
         }
-
-        /* أزرار الإجراءات السفلية */
-        .action-buttons {
-            display: flex;
-            justify-content: center;
-            gap: 30px;
-            margin-top: 40px;
+        
+        .btn-info {
+            background-color: #4169E1; color: white; border: none; width: 30px; height: 30px; font-weight: bold; font-size: 16px; cursor: pointer; border-radius: 4px;
         }
-
-        .btn-action {
-            background-color: #4873c4;
-            color: white;
-            border: none;
-            padding: 10px 40px;
-            font-size: 18px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: 0.3s;
+        .action-buttons { display: flex; justify-content: center; gap: 30px; margin-top: 50px; }
+        .action-buttons button {
+            background-color: #4169E1; color: white; border: none; padding: 10px 40px; font-size: 16px; font-weight: bold; cursor: pointer; border-radius: 4px; transition: 0.3s;
         }
-
-        .btn-action:hover {
-            background-color: #365a9e;
-        }
-
-        /* زر الذكاء الاصطناعي */
-        .ai-button {
-            position: absolute;
-            left: 40px;
-            bottom: 100px;
-            background-color: #4873c4;
-            color: white;
-            border: none;
-            width: 60px;
-            height: 60px;
-            font-size: 20px;
-            font-weight: bold;
-            cursor: pointer;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-        }
+        .action-buttons button:hover, .btn-info:hover { background-color: #2b4cad; }
     </style>
 </head>
 <body>
 
-    <div class="main-container">
+<div class="container">
+    <div class="header-banner">
+        <img src="photo.jpeg" alt="شعار الدائرة">
+    </div>
+
+    <h2 class="title">إقرار ضريبة المبيعات</h2>
+
+    <form method="POST" action="insert_taxreturn.php">
         
-        <div class="header-banner">
-            <div style="font-weight: bold; color: #4873c4; text-align: left; width: 100%;">
-                المملكة الأردنية الهاشمية<br>وزارة المالية<br>دائرة ضريبة الدخل والمبيعات
+        <div class="top-row">
+            <div class="input-group">
+                <label>رقم المكلف</label>
+                <!-- جلب القيمة من المتغير القادم من قاعدة البيانات -->
+                <input type="text" name="tax_number" value="<?php echo htmlspecialchars($tax_number); ?>" readonly class="readonly-field">
+            </div>
+            <div class="input-group">
+                <label>اسم المكلف</label>
+                <!-- جلب القيمة من المتغير القادم من قاعدة البيانات -->
+                <input type="text" name="tax_name" value="<?php echo htmlspecialchars($tax_name); ?>" readonly class="readonly-field">
             </div>
         </div>
 
-        <div class="page-title">إقرار ضريبة المبيعات</div>
-
-        <form method="POST" action="process_tax.php">
-            
-            <div class="top-section">
-                <div class="flex-row">
-                    <div class="input-group">
-                        <label>رقم المكلف</label>
-                        <input type="text" value="<?php echo htmlspecialchars($taxpayer_number); ?>" readonly>
-                    </div>
-                    <div class="input-group">
-                        <label>اسم المكلف</label>
-                        <input type="text" value="<?php echo htmlspecialchars($taxpayer_name); ?>" readonly>
-                    </div>
-                </div>
-
-                <div class="flex-row">
-                    <div class="input-group">
-                        <label>نوع الإقرار</label>
-                        <select name="return_type">
-                            <option value="">-- اختر --</option>
-                            <option value="1">أصلي</option>
-                            <option value="2">معدل</option>
-                        </select>
-                    </div>
-                    <div class="input-group">
-                        <label>السنة</label>
-                        <select name="tax_year">
-                            <option value="">-- اختر --</option>
-                            <option value="2024">2024</option>
-                            <option value="2025">2025</option>
-                            <option value="2026">2026</option>
-                        </select>
-                    </div>
-                    <div class="input-group">
-                        <label>الفترة</label>
-                        <select name="tax_period">
-                            <option value="">-- اختر --</option>
-                            <option value="1">الفترة الأولى</option>
-                            <option value="2">الفترة الثانية</option>
-                            <option value="3">الفترة الثالثة</option>
-                        </select>
-                    </div>
-                </div>
+        <div class="middle-row">
+            <div class="input-group">
+                <label>نوع الإقرار</label>
+                <select name="dec_type">
+                    <option value="أصلي">أصلي</option>
+      
+                </select>
             </div>
+           
+            <div class="input-group">
+                <label>الفترة</label>
+                <select name="period">
+                    <option value="1+2/2026">1+2/2026</option>
+                    <option value="3+4/2026">3+4/2026</option>
+                    <option value="5+6/2026">5+6/2026</option>
+                    <option value="7+8/2026">7+8/2026</option>
+                    <option value="9+10/2026">9+10/2026</option>
+                    <option value="11+12/2026">11+12/2026</option>
+                </select>
+            </div>
+        </div>
 
-            <div class="finance-section">
+        <div class="main-content">
+            <div class="finance-list">
                 
                 <div class="finance-row">
-                    <label>رصيد مدور من الفترة السابقة</label>
-                    <input type="number" step="0.01" name="carried_forward">
-                    <button type="button" class="btn-info-small">!</button>
+                    <label>الخانة (1): رصيد مدور من الفترة السابقة</label>
+                    <input type="number" step="0.01" id="balance" name="balance" value="<?php echo $default_balance; ?>" readonly class="readonly-field">
+                    <button type="button" class="btn-info" title="يتم جلب هذه القيمة تلقائياً من الفترات السابقة">!</button>
                 </div>
 
                 <div class="finance-row">
-                    <label>مبيعات خاضعة لنسبة 7%</label>
-                    <input type="number" step="0.01" name="sales_7_percent">
-                    <button type="button" class="btn-info-small">!</button>
+                    <label>الخانة (2): مبيعات خاضعة للنسبة 7%</label>
+                    <input type="number" step="0.01" id="sales_7" name="sales_7" required oninput="calculateTax()">
+                    <button type="button" class="btn-info" title="الرجاء إدخال إجمالي المبيعات الخاضعة للضريبة">!</button>
                 </div>
 
                 <div class="finance-row">
-                    <label>ضريبة المبيعات الخاضعة للنسبة</label>
-                    <input type="number" step="0.01" name="tax_subject_to_ratio">
-                    <button type="button" class="btn-info-small">!</button>
+                    <label>الخانة (3): ضريبة المبيعات الخاضعة للنسبة</label>
+                    <input type="number" step="0.01" id="tax_subject" name="tax_subject" readonly class="readonly-field">
+                    <button type="button" class="btn-info" title="تُحسب تلقائياً (الخانة 2 × 7%)">!</button>
                 </div>
 
                 <div class="finance-row">
-                    <label>حركة تعديل لصالح المسجل</label>
-                    <input type="number" step="0.01" name="adj_registrant">
-                    <button type="button" class="btn-info-small">!</button>
+                    <label>الخانة (4): حركة تعديل لصالح المسجل</label>
+                    <input type="number" step="0.01" id="adj_reg" name="adj_reg" value="<?php echo $default_adj_reg; ?>" readonly class="readonly-field">
+                    <button type="button" class="btn-info" title="يتم جلبها تلقائياً إن وجدت">!</button>
                 </div>
 
                 <div class="finance-row">
-                    <label>حركة تعديل لصالح الدائرة</label>
-                    <input type="number" step="0.01" name="adj_department">
-                    <button type="button" class="btn-info-small">!</button>
+                    <label>الخانة (5): حركة تعديل لصالح الدائرة</label>
+                    <input type="number" step="0.01" id="adj_dep" name="adj_dep" value="0" oninput="calculateTax()">
+                    <button type="button" class="btn-info" title="أدخل قيمة التعديلات المستحقة للدائرة إن وجدت">!</button>
                 </div>
 
                 <div class="finance-row">
-                    <label>الضريبة المستحقة موجبة <br><small>(مبلغ واجب دفعه)</small></label>
-                    <input type="number" step="0.01" name="tax_due_positive">
-                    <button type="button" class="btn-info-small">!</button>
+                    <label>الخانة (6): الضريبة المستحقة موجبة (دفع)</label>
+                    <input type="number" step="0.01" id="tax_due_pos" name="tax_due_pos" readonly class="readonly-field">
+                    <button type="button" class="btn-info" title="تُحسب تلقائياً">!</button>
                 </div>
 
                 <div class="finance-row">
-                    <label>الضريبة المستحقة سالبة <br><small>(المدور لصالحك الفترة القادمة)</small></label>
-                    <input type="number" step="0.01" name="tax_due_negative">
-                    <button type="button" class="btn-info-small">!</button>
+                    <label>الخانة (7): الضريبة المستحقة سالبة (مدور)</label>
+                    <input type="number" step="0.01" id="tax_due_neg" name="tax_due_neg" readonly class="readonly-field">
+                    <button type="button" class="btn-info" title="تُحسب تلقائياً">!</button>
                 </div>
 
             </div>
+        </div>
 
-            <div class="action-buttons">
-                <button type="submit" class="btn-action">إرسال</button>
-                <button type="button" class="btn-action" onclick="window.print()">طباعة</button>
-                <button type="button" class="btn-action" onclick="window.location.href='mains.php'">إلغاء / عودة</button>
-            </div>
+        <div class="action-buttons">
+            <button type="submit">إرسال الإقرار</button>
+            <button type="button" onclick="window.location.href='mains.php'">إلغاء</button>
+            <button type="button" onclick="window.print()">طباعة (PDF)</button>
+        </div>
 
-        </form>
+    </form>
+</div>
 
+<script>
+    function calculateTax() {
+        let balance = parseFloat(document.getElementById('balance').value) || 0;
+        let sales_7 = parseFloat(document.getElementById('sales_7').value) || 0;
+        let adj_reg = parseFloat(document.getElementById('adj_reg').value) || 0;
+        let adj_dep = parseFloat(document.getElementById('adj_dep').value) || 0;
 
-    </div>
+        let tax_subject = sales_7 * 0.07;
+        document.getElementById('tax_subject').value = tax_subject.toFixed(3);
+
+        let result = tax_subject - (balance + adj_reg) + adj_dep;
+
+        if (result > 0) {
+            document.getElementById('tax_due_pos').value = result.toFixed(3);
+            document.getElementById('tax_due_neg').value = 0;
+        } else {
+            document.getElementById('tax_due_pos').value = 0;
+            document.getElementById('tax_due_neg').value = Math.abs(result).toFixed(3);
+        }
+    }
+    window.onload = calculateTax;
+</script>
 
 </body>
 </html>

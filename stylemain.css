@@ -1,0 +1,172 @@
+/* ملف main_style.css */
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f0f2f5;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+}
+
+/* الكلاس الرئيسي للحاوية */
+.main-app-container {
+    width: 90%;
+    max-width: 1200px;
+    background-color: #ffffff;
+    min-height: 100vh;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+    position: relative;
+    padding-bottom: 50px;
+}
+
+/* الترويسة والشعار */
+.header-banner {
+    width: 100%;
+    height: 100px;
+    background-color: #ffffff;
+    border-bottom: 6px solid #4873c4;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.header-image {
+    width: 200%;
+    height: 200%;
+    object-fit: contain;
+}
+
+.page-title {
+    text-align: center;
+    color: #000;
+    margin: 30px 0;
+    font-size: 28px;
+    font-weight: bold;
+}
+
+/* الشريط الملاحي */
+.navbar {
+    background-color: #4873c4;
+    display: flex;
+    justify-content: space-around;
+    padding: 15px 0;
+    margin: 0 40px;
+}
+
+.navbar a {
+    color: white;
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 16px;
+}
+
+.navbar a:hover {
+    text-decoration: underline;
+}
+
+/* بيانات المكلف */
+.taxpayer-info-section {
+    display: flex;
+    justify-content: center;
+    gap: 100px;
+    margin: 40px 0;
+}
+
+.input-group {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.input-group label {
+    font-weight: bold;
+    font-size: 16px;
+}
+
+.input-group input {
+    padding: 8px 10px;
+    border: 1px solid #777;
+    width: 250px;
+    font-size: 16px;
+    background-color: #fafafa;
+}
+
+/* شبكة اللفائف (Cards) */
+.cards-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 40px;
+    padding: 0 100px;
+    margin-top: 50px;
+}
+
+.scroll-card {
+    background: #ffffff;
+    border: 1px solid #ccc;
+    border-radius: 10px;
+    padding: 40px 20px;
+    text-align: center;
+    font-size: 22px;
+    font-weight: bold;
+    color: #000;
+    cursor: pointer;
+    text-decoration: none;
+    position: relative;
+    box-shadow: inset 0px 0px 15px rgba(0,0,0,0.05), 0 5px 10px rgba(0,0,0,0.1);
+    transition: all 0.3s ease;
+}
+
+.scroll-card::before {
+    content: '';
+    position: absolute;
+    top: -10px; left: 5%; right: 5%;
+    height: 20px;
+    background: linear-gradient(to bottom, #e0e0e0, #ffffff);
+    border-radius: 50%;
+    border: 1px solid #ccc;
+    border-bottom: none;
+}
+
+.scroll-card::after {
+    content: '';
+    position: absolute;
+    bottom: -10px; left: 5%; right: 5%;
+    height: 20px;
+    background: linear-gradient(to top, #e0e0e0, #ffffff);
+    border-radius: 50%;
+    border: 1px solid #ccc;
+    border-top: none;
+}
+
+.scroll-card:hover {
+    transform: translateY(-5px);
+    box-shadow: inset 0px 0px 15px rgba(0,0,0,0.05), 0 10px 15px rgba(0,0,0,0.2);
+    border-color: #4873c4;
+    color: #4873c4;
+}
+
+/* زر AI العائم */
+.btn-ai-float {
+    position: absolute;
+    left: 40px;
+    bottom: 100px;
+    background-color: #4873c4;
+    color: white;
+    border: none;
+    width: 70px;
+    height: 70px;
+    font-size: 24px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 4px; /* لجعله مربعاً كما في الصورة */
+}
+
+.btn-ai-float:hover {
+    background-color: #365a9e;
+}
