@@ -1,299 +1,417 @@
 <?php
-// بيانات تجريبية للمكلف (يمكن ربطها بقاعدة البيانات لاحقاً)
-$taxpayer_number = "123456789";
-$taxpayer_name = "شركة العقبة للتجارة العامة";
-$e_payment_no = "987654321";
+session_start();
+include "config.php";
 
-// بيانات تجريبية لجدول أمر القبض
-$payments = [
-    ['desc' => 'ضريبة مبيعات شهر 3', 'year' => '2024', 'period' => '3', 'amount' => '1500.50'],
-];
+if (!isset($_SESSION["taxpayer_id"])) {
+    header("Location: login.php");
+    exit;
+}
+
+$taxpayer_id = $_SESSION["taxpayer_id"];
+
+/* بيانات المكلف */
+$query = "
+SELECT
+    taxpayer_number,
+    taxpayer_name,
+    electronic_payment_number
+FROM taxpayers
+WHERE taxpayer_id = ?
+LIMIT 1
+";
+
+$stmt = mysqli_prepare($conn, $query);
+mysqli_stmt_bind_param($stmt, "i", $taxpayer_id);
+mysqli_stmt_execute($stmt);
+
+$result = mysqli_stmt_get_result($stmt);
+
+if (!$taxpayer = mysqli_fetch_assoc($result)) {
+    die("لم يتم العثور على بيانات المكلف");
+}
+
+/* أوامر القبض */
+$query2 = "
+SELECT
+    declaration_type,
+    period,
+    positive_tax_due,
+    diff_amount
+FROM tax_declaration
+WHERE taxpayer_id = ?
+ORDER BY declaration_id DESC
+";
+
+$stmt2 = mysqli_prepare($conn, $query2);
+mysqli_stmt_bind_param($stmt2, "i", $taxpayer_id);
+mysqli_stmt_execute($stmt2);
+
+$rows = mysqli_stmt_get_result($stmt2);
+
+$payments = [];
+
+while ($row = mysqli_fetch_assoc($rows)) {
+
+    $type = $row["declaration_type"];
+    $period = $row["period"];
+
+    $positive = floatval($row["positive_tax_due"]);
+    $diff = floatval($row["diff_amount"]);
+
+    $amount = 0;
+    $description = "إقرار ضريبي";
+
+    if ($type == "اصلي" || $type == "أصلي" || $type == "Original") {
+
+        $description = "إقرار ضريبي أصلي";
+
+        if ($positive > 0) {
+            $amount = $positive;
+        }
+
+    } elseif ($type == "معدل" || $type == "Amended") {
+
+        $description = "إقرار ضريبي معدل";
+
+        if ($diff < 0) {
+            $amount = abs($diff);
+        }
+    }
+
+    if ($amount > 0) {
+
+        $payments[] = [
+            "description" => $description,
+            "period" => $period,
+            "amount" => number_format($amount, 3)
+        ];
+    }
+}
 ?>
 
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>الدفع الإلكتروني - نظام ضريبة المبيعات</title>
-    <style>
-        /* الإعدادات العامة للصفحة */
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f4f4f4;
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-        }
+<meta charset="UTF-8">
+<title>الدفع الإلكتروني</title>
 
-        /* الحاوية الرئيسية - تم تصغير العرض ليكون متناسقاً */
-        .window-container {
-            background-color: #ffffff;
-            width: 85%; /* العرض المصغر */
-            max-width: 1100px; /* الحد الأقصى المتناسق */
-            min-height: 90vh;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            border: 1px solid #ccc;
-            overflow: hidden;
-        }
+<style>
 
-        /* الهيدر الموحد - يغطي كامل العرض من الأعلى */
-        .header-banner {
-            width: 100%;
-            height: 120px; 
-            background-color: #ffffff;
-            border-bottom: 6px solid #4873c4; /* الخط الأزرق الفاصل */
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0;
-            padding: 0;
-        }
+*{
+    box-sizing:border-box;
+}
 
-        .header-banner img {
-            width: 100%;
-            height: 100%;
-            object-fit: fill; /* تمطيط الصورة لتغطي العرض بالكامل */
-        }
+body{
+    margin:0;
+    background:#f4f4f4;
+    font-family:"Segoe UI",Tahoma,sans-serif;
+}
 
-        /* العناوين */
-        .page-title {
-            text-align: center;
-            font-size: 28px;
-            font-weight: bold;
-            margin: 25px 0;
-            color: #000;
-        }
+.container{
+    width:1130px;
+    max-width:96%;
+    margin:auto;
+    background:white;
+    min-height:100vh;
+    border:1px solid #ccc;
+}
 
-        /* شبكة المعلومات العلوية */
-        .top-info-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 15px;
-            padding: 0 50px;
-            margin-bottom: 25px;
-        }
+.header{
+    width:100%;
+    height:82px;
+    overflow:hidden;
+    border-bottom:5px solid royalblue;
+}
 
-        .input-group {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 8px;
-        }
+.header img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+}
 
-        .input-group label {
-            font-weight: bold;
-            font-size: 16px;
-        }
+.title{
+    text-align:center;
+    font-size:34px;
+    font-weight:bold;
+    margin-top:25px;
+    margin-bottom:35px;
+}
 
-        .input-group input {
-            width: 220px;
-            padding: 10px;
-            border: 1px solid #7a7a7a;
-            text-align: center;
-            font-size: 15px;
-            background-color: #f9f9f9;
-        }
+.top-info{
+    display:flex;
+    justify-content:center;
+    gap:70px;
+    margin-bottom:25px;
+}
 
-        /* صف آلية الدفع */
-        .payment-method-row {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 15px;
-            margin-bottom: 20px;
-        }
+.info-group{
+    width:250px;
+}
 
-        .btn-pdf {
-            background-color: #4873c4;
-            color: white;
-            border: none;
-            padding: 8px 20px;
-            font-weight: bold;
-            cursor: pointer;
-            border-radius: 4px;
-        }
+.info-group label{
+    display:block;
+    text-align:right;
+    font-size:18px;
+    font-weight:bold;
+    margin-bottom:10px;
+}
 
-        .section-label {
-            text-align: center;
-            font-weight: bold;
-            font-size: 20px;
-            margin: 15px 0;
-            text-decoration: underline;
-        }
+.info-group input{
+    width:100%;
+    height:38px;
+    border:1px solid #999;
+    background:#f8f8f8;
+    font-size:16px;
+    text-align:center;
+}
 
-        /* تنسيق الجدول */
-        .table-container {
-            padding: 0 50px;
-            margin-bottom: 30px;
-            flex-grow: 1;
-        }
+.pdf-section{
+    width:900px;
+    margin:auto;
+    display:flex;
+    justify-content:flex-end;
+    align-items:center;
+    gap:18px;
+    margin-top:15px;
+    margin-bottom:40px;
+}
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            border: 1px solid #7a7a7a;
-        }
+.pdf-label{
+    font-size:18px;
+    font-weight:bold;
+}
 
-        th, td {
-            border: 1px solid #7a7a7a;
-            padding: 12px;
-            text-align: center;
-        }
+.pdf-btn{
+    width:150px;
+    height:40px;
+    background:royalblue;
+    color:white;
+    border:none;
+    font-size:16px;
+    font-weight:bold;
+    cursor:pointer;
+}
 
-        th { background-color: #f0f0f0; color: #333; font-size: 16px; }
+.pdf-btn:hover{
+    background:#274fc0;
+}
 
-        /* حقول الأقساط */
-        .bottom-info-grid {
-            display: flex;
-            justify-content: center;
-            gap: 60px;
-            margin-bottom: 30px;
-        }
+.table-title{
+    text-align:center;
+    font-size:24px;
+    font-weight:bold;
+    margin-bottom:18px;
+}
 
-        .field-with-icon {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
+.table-container{
+    width:540px;
+    margin:auto;
+}
 
-        .btn-info-circle {
-            background-color: #4873c4;
-            color: white;
-            border: none;
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            font-weight: bold;
-            cursor: help;
-        }
+table{
+    width:100%;
+    border-collapse:collapse;
+    text-align:center;
+}
 
-        /* زر AI العائم */
-        .ai-btn {
-            position: absolute;
-            left: 20px;
-            top: 50%;
-            transform: translateY(-50%);
-            background-color: #4873c4;
-            color: white;
-            border: none;
-            width: 55px;
-            height: 55px;
-            border-radius: 5px;
-            font-weight: bold;
-            font-size: 18px;
-            cursor: pointer;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-        }
+th{
+    background:#f1f1f1;
+    border:1px solid #999;
+    padding:14px;
+    font-size:17px;
+}
 
-        /* أزرار التحكم السفلية */
-        .footer-actions {
-            display: flex;
-            justify-content: center;
-            gap: 30px;
-            padding-bottom: 30px;
-        }
+td{
+    border:1px solid #999;
+    padding:14px;
+    font-size:15px;
+}
 
-        .action-btn {
-            background-color: #4873c4;
-            color: white;
-            border: none;
-            width: 130px;
-            padding: 10px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            border-radius: 4px;
-        }
+.no-data{
+    text-align:center;
+    color:red;
+    font-size:22px;
+    font-weight:bold;
+    margin-top:35px;
+}
 
-        .action-btn:hover {
-            background-color: #365a9e;
-        }
-    </style>
+.buttons{
+    text-align:center;
+    margin-top:55px;
+    margin-bottom:35px;
+}
+
+.btn{
+    width:120px;
+    height:44px;
+    background:royalblue;
+    color:white;
+    border:none;
+    font-size:18px;
+    font-weight:bold;
+    cursor:pointer;
+    margin:0 25px;
+}
+
+.btn:hover{
+    background:#274fc0;
+}
+
+@media (max-width:950px){
+
+    .top-info{
+        flex-direction:column;
+        align-items:center;
+    }
+
+    .pdf-section{
+        width:95%;
+        justify-content:center;
+        flex-direction:column;
+    }
+
+    .table-container{
+        width:95%;
+        overflow:auto;
+    }
+
+    table{
+        min-width:500px;
+    }
+}
+
+</style>
 </head>
+
 <body>
 
-    <div class="window-container">
-        <div class="header-banner">
-            <img src="photo.jpeg" alt="شعار دائرة ضريبة الدخل والمبيعات">
-        </div>
+<div class="container">
 
+<div class="header">
+    <img src="photo.jpeg">
+</div>
 
-        <div class="page-title">الدفع الإلكتروني</div>
+<div class="title">
+الدفع الإلكتروني
+</div>
 
-        <div class="top-info-grid">
-            <div class="input-group">
-                <label>رقم الدفع الإلكتروني</label>
-                <input type="text" value="<?= htmlspecialchars($e_payment_no) ?>" readonly>
-            </div>
-            <div class="input-group">
-                <label>اسم المكلف</label>
-                <input type="text" value="<?= htmlspecialchars($taxpayer_name) ?>" readonly>
-            </div>
-            <div class="input-group">
-                <label>رقم المكلف</label>
-                <input type="text" value="<?= htmlspecialchars($taxpayer_number) ?>" readonly>
-            </div>
-        </div>
+<div class="top-info">
 
-        <div class="payment-method-row">
-            <button class="btn-pdf">PDF آلية الدفع</button>
-            <label style="font-weight: bold;">آلية الدفع الإلكتروني</label>
-        </div>
+<div class="info-group">
+<label>
+رقم المكلف
+</label>
 
-        <div class="section-label">أمر قبض</div>
+<input
+type="text"
+value="<?= htmlspecialchars($taxpayer["taxpayer_number"]) ?>"
+readonly>
+</div>
 
-        <div class="table-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>وصف الحركة</th>
-                        <th>السنة</th>
-                        <th>الفترة</th>
-                        <th>المبلغ</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach($payments as $p): ?>
-                    <tr>
-                        <td><?= htmlspecialchars($p['desc']) ?></td>
-                        <td><?= htmlspecialchars($p['year']) ?></td>
-                        <td><?= htmlspecialchars($p['period']) ?></td>
-                        <td><?= htmlspecialchars($p['amount']) ?></td>
-                    </tr>
-                    <?php endforeach; ?>
-                    <tr><td style="height: 35px;"></td><td></td><td></td><td></td></tr>
-                    <tr><td style="height: 35px;"></td><td></td><td></td><td></td></tr>
-                </tbody>
-            </table>
-        </div>
+<div class="info-group">
+<label>
+اسم المكلف
+</label>
 
-        <div class="bottom-info-grid">
-            <div class="input-group">
-                <label>قيمة القسط</label>
-                <div class="field-with-icon">
-                    <button class="btn-info-circle" title="القيمة الشهرية للقسط">!</button>
-                    <input type="text" placeholder="0.00" style="width: 180px;">
-                </div>
-            </div>
-            <div class="input-group">
-                <label>عدد الأقساط</label>
-                <input type="text" placeholder="0" style="width: 180px;">
-            </div>
-        </div>
+<input
+type="text"
+value="<?= htmlspecialchars($taxpayer["taxpayer_name"]) ?>"
+readonly>
+</div>
 
-        <div class="footer-actions">
-            <button class="action-btn" onclick="window.location.href='mains.php'">خروج</button>
-            <button class="action-btn" onclick="window.print()">طباعة</button>
-            
-        </div>
-    </div>
+<div class="info-group">
+<label>
+رقم الدفع الإلكتروني
+</label>
+
+<input
+type="text"
+value="<?= htmlspecialchars($taxpayer["electronic_payment_number"]) ?>"
+readonly>
+</div>
+
+</div>
+
+<div class="pdf-section">
+
+<div class="pdf-label">
+آلية الدفع الإلكتروني
+</div>
+
+<button
+class="pdf-btn"
+onclick="window.open('اليه الدفع الالكتروني.pdf')">
+PDF آلية الدفع
+</button>
+
+</div>
+
+<div class="table-title">
+أمر قبض
+</div>
+
+<div class="table-container">
+
+<?php if(count($payments) > 0): ?>
+
+<table>
+
+<tr>
+<th>وصف الحركة</th>
+<th>الفترة</th>
+<th>المبلغ</th>
+</tr>
+
+<?php foreach($payments as $pay): ?>
+
+<tr>
+
+<td>
+<?= htmlspecialchars($pay["description"]) ?>
+</td>
+
+<td>
+<?= htmlspecialchars($pay["period"]) ?>
+</td>
+
+<td>
+<?= htmlspecialchars($pay["amount"]) ?>
+</td>
+
+</tr>
+
+<?php endforeach; ?>
+
+</table>
+
+<?php else: ?>
+
+<div class="no-data">
+لا يوجد مبالغ مستحقة للدفع
+</div>
+
+<?php endif; ?>
+
+</div>
+
+<div class="buttons">
+
+<button
+class="btn"
+onclick="window.location.href='mains.php'">
+خروج
+</button>
+
+<button
+class="btn"
+onclick="window.print()">
+طباعة
+</button>
+
+</div>
+
+</div>
 
 </body>
 </html>

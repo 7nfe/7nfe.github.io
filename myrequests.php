@@ -1,98 +1,338 @@
 <?php
-// البدء في استخدام الجلسة للوصول إلى رقم المكلف المسجل دخوله
 session_start();
-include("config.php");
+include "config.php";
 
-// التحقق مما إذا كان المستخدم قد قام بتسجيل الدخول فعلاً
-// نفترض أنك قمت بتخزين 'taxpayer_id' في الجلسة عند صفحة login.php
-if (!isset($_SESSION['taxpayer_id'])) {
-    header("Location: login.php"); // إعادة التوجيه لصفحة الدخول إذا لم يكن مسجلاً
-    exit();
+if (!isset($_SESSION["taxpayer_id"])) {
+    header("Location: login.php");
+    exit;
 }
 
-$taxpayer_id = $_SESSION['taxpayer_id'];
+$taxpayer_id = $_SESSION["taxpayer_id"];
 
-// استعلام لجلب بيانات المكلف من جدول taxpayers
-$sql = "SELECT * FROM taxpayers WHERE taxpayer_id = '$taxpayer_id'";
-$result = mysqli_query($conn, $sql);
-$userData = mysqli_fetch_assoc($result);
+/* بيانات المكلف */
+$query = "
+SELECT
+    taxpayer_name,
+    taxpayer_number
+FROM taxpayers
+WHERE taxpayer_id = ?
+LIMIT 1
+";
 
-if (!$userData) {
-    echo "لم يتم العثور على بيانات لهذا المستخدم.";
-    exit();
+$stmt = mysqli_prepare($conn, $query);
+mysqli_stmt_bind_param($stmt, "i", $taxpayer_id);
+mysqli_stmt_execute($stmt);
+
+$result = mysqli_stmt_get_result($stmt);
+
+if (!$taxpayer = mysqli_fetch_assoc($result)) {
+    die("لم يتم العثور على بيانات المكلف");
 }
+
+/* الطلبات */
+$query2 = "
+SELECT
+    transaction_number,
+    service_name,
+    submit_date,
+    status
+FROM service_requests
+WHERE taxpayer_id = ?
+
+UNION ALL
+
+SELECT
+    CONCAT('تعديل البيانات-', request_id) AS transaction_number,
+    'طلب تعديل البيانات الشخصية' AS service_name,
+    request_date AS submit_date,
+    status
+FROM edit_requests
+WHERE taxpayer_id = ?
+
+ORDER BY submit_date DESC
+";
+
+$stmt2 = mysqli_prepare($conn, $query2);
+
+mysqli_stmt_bind_param(
+    $stmt2,
+    "ii",
+    $taxpayer_id,
+    $taxpayer_id
+);
+
+mysqli_stmt_execute($stmt2);
+
+$requests = mysqli_stmt_get_result($stmt2);
 ?>
 
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
+
 <head>
     <meta charset="UTF-8">
-    <title>بياناتي الشخصية - نظام الضريبة</title>
+    <title>طلباتي</title>
+
     <style>
-        body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f7f6; padding: 20px; }
-        .profile-card {
-            max-width: 800px;
-            margin: 0 auto;
-            background: white;
-            padding: 30px;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        * {
+            box-sizing: border-box;
         }
-        .header { border-bottom: 2px solid #4873c4; margin-bottom: 20px; padding-bottom: 10px; color: #4873c4; }
-        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-        .info-item { margin-bottom: 15px; }
-        .label { font-weight: bold; color: #555; display: block; margin-bottom: 5px; }
-        .value { background: #f9f9f9; padding: 10px; border-radius: 4px; border: 1px solid #eee; display: block; }
+
+        body {
+            margin: 0;
+            background: #f4f4f4;
+            font-family: "Segoe UI", Tahoma, sans-serif;
+        }
+
+        .container {
+            width: 1180px;
+            max-width: 96%;
+            margin: auto;
+            background: white;
+            min-height: 100vh;
+            border: 1px solid #ccc;
+        }
+
+        .header {
+            width: 100%;
+            height: 90px;
+            overflow: hidden;
+            border-bottom: 5px solid royalblue;
+        }
+
+        .header img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .title {
+            text-align: center;
+            font-size: 34px;
+            font-weight: bold;
+            margin-top: 25px;
+            margin-bottom: 35px;
+        }
+
+        .top-info {
+            display: flex;
+            justify-content: center;
+            gap: 180px;
+            margin-bottom: 35px;
+        }
+
+        .info-group {
+            width: 280px;
+        }
+
+        .info-group label {
+            display: block;
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-align: right;
+        }
+
+        .info-group input {
+            width: 100%;
+            height: 38px;
+            border: 1px solid #999;
+            background: #f8f8f8;
+            text-align: center;
+            font-size: 16px;
+        }
+
+        .table-container {
+            width: 940px;
+            margin: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: center;
+        }
+
+        th {
+            background: #f1f1f1;
+            font-size: 17px;
+            padding: 14px;
+            border: 1px solid #999;
+        }
+
+        td {
+            padding: 14px;
+            border: 1px solid #999;
+            font-size: 15px;
+        }
+
+        .no-data {
+            text-align: center;
+            color: red;
+            font-size: 20px;
+            font-weight: bold;
+            margin-top: 30px;
+        }
+
+        .buttons {
+            text-align: center;
+            margin-top: 45px;
+            margin-bottom: 35px;
+        }
+
+        .btn {
+            width: 140px;
+            height: 45px;
+            background: royalblue;
+            color: white;
+            border: none;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 0 18px;
+        }
+
+        .btn:hover {
+            background: #274fc0;
+        }
+
+        @media (max-width:1000px) {
+
+            .top-info {
+                flex-direction: column;
+                align-items: center;
+                gap: 30px;
+            }
+
+            .table-container {
+                width: 95%;
+                overflow: auto;
+            }
+
+            table {
+                min-width: 750px;
+            }
+        }
     </style>
 </head>
+
 <body>
 
-<div class="profile-card">
-    <div class="header">
-        <h2>الملف الشخصي للمكلف</h2>
-    </div>
+    <div class="container">
 
-    <div class="info-grid">
-        <!-- عرض البيانات بناءً على أسماء الأعمدة في قاعدة بياناتك -->
-        <div class="info-item">
-            <span class="label">رقم المكلف:</span>
-            <span class="value"><?php echo htmlspecialchars($userData['taxpayer_id']); ?></span>
+        <div class="header">
+            <img src="photo.jpeg">
         </div>
-        <div class="info-item">
-            <span class="label">اسم المكلف:</span>
-            <span class="value"><?php echo htmlspecialchars($userData['taxpayer_name']); ?></span>
-        </div>
-        <div class="info-item">
-            <span class="label">البريد الإلكتروني:</span>
-            <span class="value"><?php echo htmlspecialchars($userData['email']); ?></span>
-        </div>
-        <div class="info-item">
-            <span class="label">رقم الهاتف:</span>
-            <span class="value"><?php echo htmlspecialchars($userData['phone_number']); ?></span>
-        </div>
-        <div class="info-item">
-            <span class="label">الاسم التجاري:</span>
-            <span class="value"><?php echo htmlspecialchars($userData['trade_name']); ?></span>
-        </div>
-        <div class="info-item">
-            <span class="label">العنوان:</span>
-            <span class="value"><?php echo htmlspecialchars($userData['address']); ?></span>
-        </div>
-        <div class="info-item">
-            <span class="label">الرقم الوطني للمنشأة:</span>
-            <span class="value"><?php echo htmlspecialchars($userData['national_establishment_number']); ?></span>
-        </div>
-        <div class="info-item">
-            <span class="label">طبيعة النشاط:</span>
-            <span class="value"><?php echo htmlspecialchars($userData['nature_of_activity']); ?></span>
-        </div>
-    </div>
 
-    <div style="margin-top: 30px; text-align: center;">
-        <button onclick="window.print()" style="padding: 10px 20px; background: #2ecc71; color: white; border: none; border-radius: 4px; cursor: pointer;">طباعة البيانات</button>
-        <a href="logout.php" style="margin-right: 10px; color: #e74c3c;">تسجيل الخروج</a>
+        <div class="title">
+            طلباتي
+        </div>
+
+        <div class="top-info">
+
+            <div class="info-group">
+                <label>
+                    رقم المكلف
+                </label>
+
+                <input
+                    type="text"
+                    value="<?= htmlspecialchars($taxpayer["taxpayer_number"]) ?>"
+                    readonly>
+            </div>
+
+            <div class="info-group">
+                <label>
+                    اسم المكلف
+                </label>
+
+                <input
+                    type="text"
+                    value="<?= htmlspecialchars($taxpayer["taxpayer_name"]) ?>"
+                    readonly>
+            </div>
+
+        </div>
+
+        <div class="table-container">
+
+            <?php if (mysqli_num_rows($requests) > 0): ?>
+
+                <table>
+
+                    <tr>
+                        <th>اسم الخدمة</th>
+                        <th>رقم المعاملة</th>
+                        <th>تاريخ تقديم الطلب</th>
+                        <th>الحالة</th>
+                    </tr>
+
+                    <?php while ($row = mysqli_fetch_assoc($requests)): ?>
+
+                        <tr>
+
+                            <td>
+                                <?= htmlspecialchars($row["service_name"]) ?>
+                            </td>
+
+                            <td>
+                                <?= htmlspecialchars($row["transaction_number"]) ?>
+                            </td>
+
+                            <td>
+                                <?= htmlspecialchars($row["submit_date"]) ?>
+                            </td>
+
+                            <td>
+
+                                <?php
+                                if ($row["status"] == "pending") {
+                                    echo "قيد المراجعة";
+                                } elseif ($row["status"] == "approved") {
+                                    echo "تمت الموافقة";
+                                } elseif ($row["status"] == "rejected") {
+                                    echo "مرفوض";
+                                } else {
+                                    echo htmlspecialchars($row["status"]);
+                                }
+                                ?>
+
+                            </td>
+
+                        </tr>
+
+                    <?php endwhile; ?>
+
+                </table>
+
+            <?php else: ?>
+
+                <div class="no-data">
+                    لا يوجد طلبات لهذا المكلف حتى الآن
+                </div>
+
+            <?php endif; ?>
+
+        </div>
+
+        <div class="buttons">
+
+            <button
+                class="btn"
+                onclick="window.location.href='mains.php'">
+                رجوع
+            </button>
+
+            <button
+                class="btn"
+                onclick="window.print()">
+                طباعة
+            </button>
+
+        </div>
+
     </div>
-</div>
 
 </body>
+
 </html>

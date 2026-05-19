@@ -1,199 +1,292 @@
 <?php
 session_start();
+include "config.php";
 
-// معالجة البيانات عند الضغط على "التالي"
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $goods_tax = $_POST['goods_tax'] ?? '';
-    $services_tax = $_POST['services_tax'] ?? '';
-
-    // تخزين الإجابات في الجلسة لاستخدامها لاحقاً في النظام
-    $_SESSION['is_subject_to_goods'] = $goods_tax;
-    $_SESSION['is_subject_to_services'] = $services_tax;
-
-    // التوجيه إلى صفحة تسجيل الدخول أو الصفحة التالية
+if (!isset($_SESSION["taxpayer_id"])) {
     header("Location: login.php");
-    exit();
+    exit;
+}
+
+$taxpayer_id = $_SESSION["taxpayer_id"];
+$message = "";
+$message_type = "";
+
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+
+    if (isset($_POST["open_pdf"])) {
+        $pdfPath = "جدول السلع والخدمات.pdf";
+
+        if (file_exists($pdfPath)) {
+            header("Location: " . $pdfPath);
+            exit;
+        } else {
+            $message = "ملف جدول السلع والخدمات غير موجود داخل مجلد المشروع.";
+            $message_type = "error";
+        }
+    }
+
+    if (isset($_POST["next"])) {
+
+        $goods = $_POST["goods"] ?? "";
+        $services = $_POST["services"] ?? "";
+
+        if ($goods === "" || $services === "") {
+            $message = "يجب الإجابة على السؤالين قبل المتابعة.";
+            $message_type = "error";
+        } else {
+
+            $is_goods = ($goods === "yes") ? 1 : 0;
+            $is_service = ($services === "yes") ? 1 : 0;
+
+            $query = "
+                UPDATE taxpayers
+                SET is_goods = ?, is_service = ?
+                WHERE taxpayer_id = ?
+            ";
+
+            $stmt = mysqli_prepare($conn, $query);
+
+            if ($stmt) {
+                mysqli_stmt_bind_param($stmt, "iii", $is_goods, $is_service, $taxpayer_id);
+                mysqli_stmt_execute($stmt);
+
+                if (mysqli_stmt_affected_rows($stmt) >= 0) {
+
+                   if ($is_goods == 0 && $is_service == 0) {
+
+    $message = "أنت غير ملزم بالتسجيل في ضريبة المبيعات.";
+
+} else {
+
+    header("Location: registration.php");
+    exit;
+}
+
+                } else {
+                    $message = "لم يتم العثور على المكلف في قاعدة البيانات.";
+                    $message_type = "error";
+                }
+
+                mysqli_stmt_close($stmt);
+            } else {
+                $message = "حدث خطأ أثناء تجهيز الاستعلام.";
+                $message_type = "error";
+            }
+        }
+    }
 }
 ?>
 
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>هل أنت ملزم؟ - ضريبة المبيعات</title>
-    <style>
-        /* التنسيقات العامة */
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f0f2f5;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            height: 100vh;
-        }
+<meta charset="UTF-8">
+<title>هل أنت ملزم؟</title>
 
-        /* الترويسة العلوية */
-        .header-banner {
-            width: 100%;
-            height: 80px;
-            background-color: #ffffff;
-            border-bottom: 4px solid #4873c4;
-            display: flex;
-            align-items: center;
-            padding: 0 20px;
-            box-sizing: border-box;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
+<style>
+* {
+    box-sizing: border-box;
+}
 
-        .header-text {
-            font-weight: bold;
-            color: #4873c4;
-            text-align: left;
-            width: 100%;
-            line-height: 1.5;
-        }
+body {
+    margin: 0;
+    font-family: "Segoe UI", Tahoma, sans-serif;
+    background: white;
+    color: black;
+}
 
-        /* حاوية المحتوى الرئيسي */
-        .content-container {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            width: 100%;
-        }
+.header {
+    width: 100%;
+    height: 82px;
+    overflow: hidden;
+    border-bottom: 1px solid #ddd;
+}
 
-        .page-title {
-            font-size: 28px;
-            font-weight: bold;
-            margin-bottom: 30px;
-            color: #000;
-        }
+.header img {
+    width: 100%;
+    height: 82px;
+    object-fit: cover;
+}
 
-        /* الصندوق الأبيض المركزي */
-        .white-box {
-            background-color: #ffffff;
-            width: 700px;
-            padding: 50px;
-            border: 1px solid #ccc;
-            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
-            position: relative;
-        }
+.container {
+    width: 100%;
+    min-height: calc(100vh - 82px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 55px;
+}
 
-        /* تنسيق الأسئلة والخيارات */
-        .question-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 40px;
-        }
+.title {
+    font-size: 32px;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
 
-        .question-text {
-            font-size: 18px;
-            font-weight: bold;
-            flex-grow: 1;
-            text-align: right;
-        }
+.form-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+}
 
-        .options-group {
-            display: flex;
-            gap: 30px;
-            margin-right: 40px;
-        }
+.questions-box {
+    width: 560px;
+    background: white;
+    border: 1px solid #ddd;
+    padding: 35px 25px;
+    margin-top: 10px;
+}
 
-        .option {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 18px;
-        }
+.question {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 35px;
+    font-size: 20px;
+}
 
-        /* تنسيق الأزرار */
-        .btn-list {
-            position: absolute;
-            left: -120px; /* تموضعه بجانب الصندوق كما في الصورة */
-            top: 50%;
-            transform: translateY(-50%);
-            background-color: #4873c4;
-            color: white;
-            border: none;
-            padding: 10px 25px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
+.options {
+    display: flex;
+    gap: 20px;
+    font-size: 18px;
+}
 
-        .btn-next {
-            background-color: #4873c4;
-            color: white;
-            border: none;
-            padding: 12px 60px;
-            font-size: 18px;
-            font-weight: bold;
-            cursor: pointer;
-            margin-top: 50px;
-            transition: background-color 0.3s;
-        }
+.options label {
+    cursor: pointer;
+}
 
-        .btn-list:hover, .btn-next:hover {
-            background-color: #365a9e;
-        }
+.btn {
+    background: royalblue;
+    color: white;
+    border: none;
+    width: 150px;
+    height: 45px;
+    font-size: 17px;
+    cursor: pointer;
+    font-family: "Segoe UI", Tahoma, sans-serif;
+}
 
-        input[type="radio"] {
-            transform: scale(1.2);
-            cursor: pointer;
-        }
-    </style>
+.btn:hover {
+    background: #244fc7;
+}
+
+.btn-pdf {
+    margin-top: 95px;
+}
+
+.btn-next {
+    margin-top: 18px;
+}
+
+.message {
+    margin-top: 20px;
+    font-size: 18px;
+    font-weight: bold;
+    text-align: center;
+}
+
+.error {
+    color: red;
+}
+
+.info {
+    color: royalblue;
+}
+
+@media (max-width: 750px) {
+    .form-row {
+        flex-direction: column;
+    }
+
+    .questions-box {
+        width: 90%;
+    }
+
+    .question {
+        flex-direction: column;
+        gap: 15px;
+        text-align: center;
+    }
+
+    .btn-pdf {
+        margin-top: 10px;
+    }
+}
+</style>
 </head>
+
 <body>
 
-    <div class="header-banner">
-        <div class="header-text">
-            المملكة الأردنية الهاشمية<br>وزارة المالية<br>دائرة ضريبة الدخل والمبيعات
+<div class="header">
+    <img src="photo.jpeg" alt="الشعار">
+</div>
+
+<div class="container">
+
+    <div class="title">هل أنت ملزم؟</div>
+
+    <form method="POST">
+
+        <div class="form-row">
+
+            <div class="questions-box">
+
+                <div class="question">
+                    <div>هل أنت خاضع لضريبة المبيعات على السلع؟</div>
+
+                    <div class="options">
+                        <label>
+                            <input type="radio" name="goods" value="yes">
+                            نعم
+                        </label>
+
+                        <label>
+                            <input type="radio" name="goods" value="no">
+                            لا
+                        </label>
+                    </div>
+                </div>
+
+                <div class="question">
+                    <div>هل أنت خاضع لضريبة المبيعات على الخدمات؟</div>
+
+                    <div class="options">
+                        <label>
+                            <input type="radio" name="services" value="yes">
+                            نعم
+                        </label>
+
+                        <label>
+                            <input type="radio" name="services" value="no">
+                            لا
+                        </label>
+                    </div>
+                </div>
+
+            </div>
+
+            <button type="submit" name="open_pdf" class="btn btn-pdf">
+                عرض القائمة
+            </button>
+
         </div>
-    </div>
 
-    <div class="content-container">
-        <div class="page-title">هل أنت ملزم؟</div>
+        <div style="text-align:center;">
+            <button type="submit" name="next" class="btn btn-next">
+                التالي
+            </button>
+        </div>
 
-        <form method="POST" action="">
-            <div class="white-box">
-                <button type="button" class="btn-list">عرض القائمة</button>
+    </form>
 
-                <div class="question-row">
-                    <div class="question-text">هل أنت خاضع لضريبة المبيعات على السلع؟</div>
-                    <div class="options-group">
-                        <label class="option">
-                            <input type="radio" name="goods_tax" value="yes" required> نعم
-                        </label>
-                        <label class="option">
-                            <input type="radio" name="goods_tax" value="no"> لا
-                        </label>
-                    </div>
-                </div>
+    <?php if (!empty($message)): ?>
+        <div class="message <?= $message_type ?>">
+            <?= htmlspecialchars($message) ?>
+        </div>
+    <?php endif; ?>
 
-                <div class="question-row" style="margin-bottom: 0;">
-                    <div class="question-text">هل أنت خاضع لضريبة المبيعات على الخدمات؟</div>
-                    <div class="options-group">
-                        <label class="option">
-                            <input type="radio" name="services_tax" value="yes" required> نعم
-                        </label>
-                        <label class="option">
-                            <input type="radio" name="services_tax" value="no"> لا
-                        </label>
-                    </div>
-                </div>
-            </div>
-
-            <div style="text-align: center;">
-                <button type="submit" class="btn-next">التالي</button>
-            </div>
-        </form>
-    </div>
+</div>
 
 </body>
 </html>

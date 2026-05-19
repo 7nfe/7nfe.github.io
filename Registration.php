@@ -1,300 +1,456 @@
 <?php
-// معالجة البيانات عند إرسال النموذج (Submit)
-$message = "";
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    // استلام البيانات من النموذج
-    $taxpayer_name = $_POST['taxpayer_name'] ?? '';
-    $taxpayer_number = $_POST['taxpayer_number'] ?? '';
-    
-    // هنا يمكنك إضافة كود الحفظ في قاعدة البيانات
-    $message = "تم استلام طلب المكلف: " . htmlspecialchars($taxpayer_name);
+session_start();
+include "config.php";
+
+if (!isset($_SESSION["taxpayer_id"])) {
+    header("Location: login.php");
+    exit;
 }
-include 'config.php';
 
+$taxpayer_id = $_SESSION["taxpayer_id"];
+$message = "";
 
+function generatePaymentNumber($conn)
+{
+    do {
+        $number = rand(10000000, 99999999);
 
+        $query = "SELECT COUNT(*) AS total FROM taxpayers WHERE electronic_payment_number = ?";
+        $stmt = mysqli_prepare($conn, $query);
+        mysqli_stmt_bind_param($stmt, "s", $number);
+        mysqli_stmt_execute($stmt);
+
+        $result = mysqli_stmt_get_result($stmt);
+        $row = mysqli_fetch_assoc($result);
+    } while ($row["total"] > 0);
+
+    return $number;
+}
+
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+
+    if (isset($_POST["register"])) {
+
+        $taxpayer_name = trim($_POST["taxpayer_name"]);
+        $phone_number = trim($_POST["phone_number"]);
+        $email = trim($_POST["email"]);
+        $trade_name = trim($_POST["trade_name"]);
+        $address = trim($_POST["address"]);
+        $registration_date = $_POST["registration_date"];
+        $registration_type = $_POST["registration_type"];
+        $designated_directorate = $_POST["designated_directorate"];
+        $nature_of_activity = $_POST["nature_of_activity"];
+        $registration_number = trim($_POST["registration_number"]);
+        $national_establishment_number = trim($_POST["national_establishment_number"]);
+        $date_of_establishment = $_POST["date_of_establishment"];
+        $taxpayer_classification = $_POST["taxpayer_classification"];
+
+        if (strlen($registration_number) < 6) {
+
+            $message = "رقم السجل التجاري يجب أن يكون 6 خانات أو أكثر.";
+        } elseif (!preg_match("/^[0-9]{10}$/", $phone_number)) {
+
+            $message = "رقم الهاتف يجب أن يكون 10 خانات.";
+        } elseif (!preg_match("/^[0-9]{9}$/", $national_establishment_number)) {
+
+            $message = "الرقم الوطني للمنشأة يجب أن يكون 9 خانات بالضبط.";
+        } else {
+
+            $payment_number = generatePaymentNumber($conn);
+
+            $query = "
+            UPDATE taxpayers
+            SET
+                taxpayer_name = ?,
+                phone_number = ?,
+                email = ?,
+                trade_name = ?,
+                address = ?,
+                registration_date = ?,
+                registration_type = ?,
+                designated_directorate = ?,
+                nature_of_activity = ?,
+                registration_number = ?,
+                national_establishment_number = ?,
+                date_of_establishment = ?,
+                taxpayer_classification = ?,
+                electronic_payment_number = ?,
+                is_registered = 2
+            WHERE taxpayer_id = ?
+            ";
+
+            $stmt = mysqli_prepare($conn, $query);
+
+            mysqli_stmt_bind_param(
+                $stmt,
+                "ssssssssssssssi",
+                $taxpayer_name,
+                $phone_number,
+                $email,
+                $trade_name,
+                $address,
+                $registration_date,
+                $registration_type,
+                $designated_directorate,
+                $nature_of_activity,
+                $registration_number,
+                $national_establishment_number,
+                $date_of_establishment,
+                $taxpayer_classification,
+                $payment_number,
+                $taxpayer_id
+            );
+
+            if (mysqli_stmt_execute($stmt)) {
+
+                session_unset();
+                session_destroy();
+
+                echo "
+                <script>
+                    alert('تم إرسال طلب التسجيل للأدمن، يرجى انتظار الموافقة');
+                    window.location.href = 'login.php';
+                </script>
+                ";
+                exit;
+            } else {
+
+                $message = "حدث خطأ أثناء حفظ البيانات";
+            }
+        }
+    }
+
+    if (isset($_POST["info"])) {
+        $message = "تاريخ بداية التسجيل هو التاريخ الذي يبدأ منه اعتبار المكلف مسجلاً في ضريبة المبيعات.";
+    }
+}
 ?>
 
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>التسجيل في ضريبة المبيعات - سلطة العقبة</title>
+    <title>التسجيل في ضريبة المبيعات</title>
+
     <style>
-        /* التنسيقات العامة */
+        * {
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: 'Segoe UI', Arial, sans-serif;
-            background-color: #f4f7f6;
             margin: 0;
-            padding: 20px;
-            display: flex;
-            justify-content: center;
+            background: #f3f3f3;
+            font-family: "Segoe UI", Tahoma, sans-serif;
+            direction: rtl;
         }
 
-        .main-container {
+        .header {
             width: 100%;
-            max-width: 1000px;
-            background-color: #ffffff;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-            border-radius: 8px;
+            height: 82px;
             overflow: hidden;
-            padding-bottom: 40px;
+            border-bottom: 6px solid #1f86d7;
+            background: white;
         }
 
-        /* تنسيق الهيدر والصورة */
-        .header-banner {
+        .header img {
             width: 100%;
-            height: 100px;
-            background-color: #fff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 10px 0;
-        }
-
-        .header-banner img {
-            max-height: 100%;
-            max-width: 100%;
-            object-fit: contain;
-        }
-
-        .page-title {
-            text-align: center;
-            color: #333;
-            margin: 25px 0;
-            font-size: 24px;
-            font-weight: bold;
-            position: relative;
-        }
-
-        .page-title::after {
-            content: '';
+            height: 82px;
+            object-fit: cover;
             display: block;
-            width: 50px;
-            height: 3px;
-            background: #4873c4;
-            margin: 8px auto;
         }
 
-        /* شبكة الحقول */
+        .container {
+            width: 1300px;
+            max-width: 98%;
+            margin: 0 auto;
+            padding-top: 20px;
+        }
+
+        .title {
+            text-align: center;
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 40px;
+        }
+
         .form-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 20px;
-            padding: 0 40px;
-        }
-
-        .input-group {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-
-        .input-group label {
-            font-weight: 600;
-            font-size: 14px;
-            color: #555;
-        }
-
-        .input-group input, 
-        .input-group select {
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            font-size: 14px;
-            transition: border 0.3s;
-        }
-
-        .input-group input:focus {
-            border-color: #4873c4;
-            outline: none;
-        }
-
-        /* تنسيق الـ Fieldset */
-        .full-width {
-            grid-column: span 3;
-            display: flex;
+            grid-template-columns: repeat(3, 320px);
             justify-content: center;
-            margin: 10px 0;
+            column-gap: 85px;
+            row-gap: 35px;
         }
 
-        fieldset {
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            padding: 15px;
-            display: flex;
-            gap: 20px;
-            justify-content: center;
-            width: 100%;
+        .form-group {
+            width: 320px;
         }
 
-        legend {
+        .form-group label {
+            display: block;
+            text-align: right;
+            font-size: 18px;
             font-weight: bold;
-            font-size: 14px;
-            color: #4873c4;
-            padding: 0 10px;
+            margin-bottom: 10px;
         }
 
-        .radio-option {
+        input,
+        select {
+            width: 100%;
+            height: 36px;
+            border: 1px solid #aaa;
+            background: white;
+            padding: 5px 10px;
+            font-size: 16px;
+            font-family: "Segoe UI", Tahoma, sans-serif;
+        }
+
+        .radio-box {
+            width: 100%;
+            height: 52px;
+            border: 1px solid #aaa;
             display: flex;
             align-items: center;
-            gap: 5px;
-            cursor: pointer;
-        }
-
-        /* أزرار الإجراءات */
-        .action-buttons {
-            display: flex;
             justify-content: center;
-            gap: 20px;
-            margin-top: 40px;
+            gap: 35px;
+            background: white;
         }
 
-        .btn-action {
-            padding: 12px 40px;
-            font-size: 16px;
-            font-weight: bold;
+        .radio-box label {
+            margin: 0;
+            font-weight: normal;
+            font-size: 17px;
+        }
+
+        .info-btn {
+            width: 55px;
+            height: 42px;
+            background: royalblue;
+            color: white;
             border: none;
-            border-radius: 4px;
+            font-size: 22px;
+            font-weight: bold;
             cursor: pointer;
-            transition: 0.3s;
         }
 
-        .btn-submit { background-color: #4873c4; color: white; }
-        .btn-submit:hover { background-color: #365a9e; }
+        .date-row {
+            display: flex;
+            gap: 10px;
+        }
 
-        .btn-cancel { background-color: #e74c3c; color: white; }
-        .btn-print { background-color: #2ecc71; color: white; }
-
-        .alert {
-            margin: 20px 40px;
+        .classification {
+            width: 710px;
+            border: 1px solid #ddd;
+            background: #fafafa;
             padding: 15px;
-            background-color: #d4edda;
-            color: #155724;
-            border-radius: 4px;
-            text-align: center;
+            margin-top: 10px;
+            margin-right: auto;
         }
 
-        /* للموبايل */
-        @media (max-width: 768px) {
-            .form-grid { grid-template-columns: 1fr; }
-            .full-width { grid-column: span 1; }
-            .action-buttons { flex-direction: column; align-items: center; }
-            .btn-action { width: 80%; }
+        .classification-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 18px;
+        }
+
+        .classification-options {
+            display: flex;
+            gap: 50px;
+            font-size: 18px;
+        }
+
+        .buttons {
+            text-align: center;
+            margin-top: 90px;
+            margin-bottom: 40px;
+        }
+
+        .main-btn {
+            width: 120px;
+            height: 45px;
+            background: royalblue;
+            color: white;
+            border: none;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 0 18px;
+        }
+
+        .main-btn:hover,
+        .info-btn:hover {
+            background: #244fc7;
+        }
+
+        .message {
+            text-align: center;
+            color: red;
+            font-size: 18px;
+            font-weight: bold;
+            margin-top: 20px;
+        }
+
+        @media (max-width:1200px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+                justify-items: center;
+            }
+
+            .classification {
+                width: 320px;
+                margin: auto;
+            }
+
+            .classification-options {
+                flex-direction: column;
+                gap: 15px;
+            }
         }
     </style>
 </head>
+
 <body>
 
-    <div class="main-container">
-        
-        <!-- الهيدر -->
-        <div class="header-banner">
-            <!-- تأكد أن ملف الصورة photo.jpeg موجود في نفس المجلد -->
-            <img src="photo.jpeg" alt="شعار منطقة العقبة الاقتصادية الخاصة">
+    <div class="header">
+        <img src="photo.jpeg">
+    </div>
+
+    <div class="container">
+
+        <div class="title">
+            التسجيل في ضريبة المبيعات
         </div>
 
-        <div class="page-title">نموذج التسجيل في ضريبة المبيعات</div>
-
-        <?php if ($message): ?>
-            <div class="alert"><?php echo $message; ?></div>
+        <?php if ($message != ""): ?>
+            <div class="message">
+                <?= htmlspecialchars($message) ?>
+            </div>
         <?php endif; ?>
 
-        <form method="POST" action="insert_registration.php">
+        <form method="POST">
+
             <div class="form-grid">
-                
-                <!-- الصف الأول -->
-                <div class="input-group">
-                    <label>رقم المكلف</label>
-                    <input type="text" name="taxpayer_number" required>
+
+                <div class="form-group">
+                    <label>نوع الطلب</label>
+
+                    <div class="radio-box">
+                        <label>
+                            <input type="radio" name="registration_type" value="تسجيل" checked>
+                            تسجيل
+                        </label>
+
+                        <label>
+                            <input type="radio" name="registration_type" value="اعادة تسجيل">
+                            اعادة تسجيل
+                        </label>
+                    </div>
                 </div>
-                <div class="input-group">
+
+                <div class="form-group">
                     <label>اسم المكلف</label>
                     <input type="text" name="taxpayer_name" required>
                 </div>
-                <div class="input-group">
-                    <label>رقم الهاتف</label>
-                    <input type="text" name="phone">
-                </div>
 
-                <!-- نوع الشخص الاعتباري -->
-                <div class="full-width">
-                    <fieldset>
-                        <legend>نوع الشخص الاعتباري</legend>
-                        <label class="radio-option"><input type="radio" name="legal_entity_type" value="تضامن توصية بسيطة"> تضامن توصية بسيطة</label>
-                        <label class="radio-option"><input type="radio" name="legal_entity_type" value="ذات مسؤولية محدودة"> ذات مسؤولية محدودة</label>
-                    </fieldset>
-                </div>
-
-                <!-- الصف الثالث -->
-                <div class="input-group">
+                <div class="form-group">
                     <label>مديرية المكلف</label>
-                    <input type="text" name="directorate">
-                </div>
-                <div class="input-group">
-                    <label>البريد الإلكتروني</label>
-                    <input type="email" name="email">
-                </div>
-                <div class="input-group">
-                    <label>الاسم التجاري</label>
-                    <input type="text" name="trade_name">
-                </div>
-
-                <!-- الصف الرابع -->
-                <div class="input-group">
-                    <label>رقم السجل التجاري</label>
-                    <input type="text" name="commercial_record">
-                </div>
-                <div class="input-group">
-                    <label>تاريخ إنشاء الشركة</label>
-                    <input type="date" name="creation_date">
-                </div>
-                <div class="input-group">
-                    <label>العنوان</label>
-                    <input type="text" name="address">
-                </div>
-
-                <!-- الصف الخامس -->
-                <div class="input-group">
-                    <label>الرقم الوطني للمنشأة</label>
-                    <input type="text" name="facility_national_id">
-                </div>
-                
-                <div class="input-group">
-                    <label>طبيعة النشاط التجاري</label>
-                    <select name="business_nature">
-                        <option value="">-- اختر --</option>
-                        <option value="تجاري">تجاري</option>
-                        <option value="صناعي">صناعي</option>
-                        <option value="خدمي">خدمي</option>
+                    <select name="designated_directorate">
+                        <option value="العقبة">العقبة</option>
                     </select>
                 </div>
 
-                <div class="input-group">
-                    <fieldset style="gap: 10px; padding: 5px 15px;">
-                        <legend>نوع الطلب</legend>
-
-
-                        <label class="radio-option"><input type="radio" name="request_type" value="تسجيل" checked> تسجيل</label>
-                        <label class="radio-option"><input type="radio" name="request_type" value="إعادة تسجيل"> إعادة</label>
-                    </fieldset>
+                <div class="form-group">
+                    <label>العنوان</label>
+                    <input type="text" name="address" required>
                 </div>
-                <div class="input-group">
-                    <label>الرمز </label>
-                    <input type="text" name="password">
+
+                <div class="form-group">
+                    <label>رقم الهاتف</label>
+                    <input type="text" name="phone_number" minlength="10" maxlength="10" required>
+                </div>
+
+                <div class="form-group">
+                    <label>البريد الإلكتروني</label>
+                    <input type="email" name="email" required>
+                </div>
+
+                <div class="form-group">
+                    <label>طبيعة النشاط التجاري</label>
+                    <select name="nature_of_activity" required>
+                        <option value="">اختر</option>
+                        <option value="خدمي">خدمي</option>
+                        <option value="تجاري">تجاري</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>رقم السجل التجاري</label>
+                    <input type="text" name="registration_number" minlength="6" required>
+                </div>
+
+                <div class="form-group">
+                    <label>الاسم التجاري</label>
+                    <input type="text" name="trade_name" required>
+                </div>
+
+                <div class="form-group">
+                    <label>تاريخ بداية التسجيل</label>
+
+                    <div class="date-row">
+                        <button type="submit" name="info" class="info-btn">!</button>
+                        <input type="date" name="registration_date" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>الرقم الوطني للمنشأة</label>
+                    <input type="text" name="national_establishment_number" minlength="9" maxlength="9" required>
+                </div>
+
+                <div class="form-group">
+                    <label>تاريخ إنشاء الشركة</label>
+                    <input type="date" name="date_of_establishment" required>
                 </div>
 
             </div>
 
-            <!-- أزرار الإجراءات -->
-            <div class="action-buttons">
-                <button type="submit" class="btn-action btn-submit">تسجيل البيانات</button>
-                <button type="button" class="btn-action btn-print" onclick="window.print()">طباعة النموذج</button>
-                <button type="reset" class="btn-action btn-cancel">إلغاء</button>
+            <div class="classification">
+
+                <div class="classification-title">
+                    تصنيف المكلف
+                </div>
+
+                <div class="classification-options">
+
+                    <label>
+                        <input type="radio" name="taxpayer_classification" value="تضامن توصية بسيطة" checked>
+                        تضامن توصية بسيطة
+                    </label>
+
+                    <label>
+                        <input type="radio" name="taxpayer_classification" value="ذات مسؤولية محدودة">
+                        ذات مسؤولية محدودة
+                    </label>
+
+                </div>
             </div>
+
+            <div class="buttons">
+
+                <button type="button" onclick="window.print()" class="main-btn">
+                    طباعة
+                </button>
+
+                <button type="submit" name="register" class="main-btn">
+                    تسجيل
+                </button>
+
+            </div>
+
         </form>
+
     </div>
 
 </body>
+
 </html>

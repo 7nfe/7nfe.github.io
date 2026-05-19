@@ -1,218 +1,230 @@
 <?php
 session_start();
+include "config.php";
 
-// محاكاة جلب بيانات المكلف من الجلسة (Session) أو قاعدة البيانات
-$taxpayer_number = $_SESSION['taxpayer_number'] ?? "123456789"; 
-$taxpayer_name = $_SESSION['taxpayer_name'] ?? "شركة العقبة للتجارة العامة"; 
+if (!isset($_SESSION["taxpayer_id"])) {
+    header("Location: login.php");
+    exit;
+}
 
-// معالجة النموذج عند الإرسال
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $cancel_reason = $_POST['cancel_reason'] ?? '';
-    
-    // هنا يمكنك إضافة كود الاتصال بقاعدة البيانات لتحديث حالة المكلف
-    // مثال: UPDATE taxpayers SET status = 'cancelled', reason = '$cancel_reason' WHERE id = '$taxpayer_number'
-    
-    // رسالة نجاح وهمية للتوضيح
-    $success_message = "تم إرسال طلب إلغاء التسجيل بنجاح.";
+$taxpayer_id = $_SESSION["taxpayer_id"];
+$message = "";
+
+$stmt = mysqli_prepare($conn, "
+    SELECT taxpayer_number, taxpayer_name
+    FROM taxpayers
+    WHERE taxpayer_id = ?
+    LIMIT 1
+");
+mysqli_stmt_bind_param($stmt, "i", $taxpayer_id);
+mysqli_stmt_execute($stmt);
+$result = mysqli_stmt_get_result($stmt);
+
+if (!$taxpayer = mysqli_fetch_assoc($result)) {
+    die("لم يتم العثور على بيانات المكلف");
+}
+
+if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST["send"])) {
+
+    $reason = trim($_POST["cancel_reason"] ?? "");
+
+    if ($reason === "") {
+        $message = "الرجاء إدخال سبب إلغاء التسجيل";
+    } else {
+
+        mysqli_begin_transaction($conn);
+
+        try {
+            $update = mysqli_prepare($conn, "
+                UPDATE taxpayers
+                SET is_registered = 0
+                WHERE taxpayer_id = ?
+            ");
+            mysqli_stmt_bind_param($update, "i", $taxpayer_id);
+            mysqli_stmt_execute($update);
+
+            $insert = mysqli_prepare($conn, "
+                INSERT INTO registration_cancel
+                (taxpayer_id, reason, cancel_date)
+                VALUES (?, ?, CURDATE())
+            ");
+            mysqli_stmt_bind_param($insert, "is", $taxpayer_id, $reason);
+            mysqli_stmt_execute($insert);
+
+            mysqli_commit($conn);
+
+            echo "
+            <script>
+                alert('تم إلغاء تسجيل المكلف بنجاح');
+                window.location.href = 'login.php';
+            </script>";
+            exit;
+
+        } catch (Exception $e) {
+            mysqli_rollback($conn);
+            $message = "حدث خطأ أثناء إلغاء التسجيل: " . $e->getMessage();
+        }
+    }
 }
 ?>
 
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>إلغاء تسجيل مكلف</title>
-    <style>
-        /* التنسيقات العامة المطابقة للنظام */
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f0f2f5;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-        }
+<meta charset="UTF-8">
+<title>إلغاء تسجيل مكلف</title>
 
-        .main-container {
-            width: 95%;
-            max-width: 1100px;
-            background-color: #ffffff;
-            min-height: 100vh;
-            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
-            position: relative;
-            padding-bottom: 50px;
-        }
+<style>
+body {
+    margin: 0;
+    background: #f4f4f4;
+    font-family: "Segoe UI", Tahoma, sans-serif;
+}
 
-        /* الترويسة */
-      .header-banner {
+.container {
+    width: 1180px;
+    max-width: 96%;
+    margin: auto;
+    background: white;
+    min-height: 100vh;
+    border: 1px solid #ccc;
+}
+
+.header {
+    height: 82px;
+    border-bottom: 5px solid royalblue;
+    overflow: hidden;
+}
+
+.header img {
     width: 100%;
-    height: 100px; /* يمكنك زيادة الارتفاع حسب حجم الصورة */
-    background-color: #ffffff;
-    border-bottom: 6px solid #4873c4;
-    padding: 0; /* أزلنا الحشو الداخلي لتأخذ الصورة كامل المساحة إذا أردت */
-    overflow: hidden; /* لمنع خروج الصورة عن الإطار */
+    height: 100%;
+    object-fit: cover;
+}
+
+.title {
+    text-align: center;
+    font-size: 34px;
+    font-weight: bold;
+    margin: 35px 0 50px;
+}
+
+.form-box {
+    width: 520px;
+    margin: auto;
+}
+
+.top-row {
     display: flex;
-    align-items: center;
-    justify-content: center; /* لتوسيط الصورة */
+    gap: 20px;
 }
 
-.header-image {
-    width: 200%; /* تجعل الصورة بعرض الهيدر */
-    height: 200%; /* تجعل الصورة بارتفاع الهيدر */
-    object-fit: contain; /* أهم خاصية: تحافظ على تناسق أبعاد الصورة دون تمطيطها */
+.group {
+    margin-bottom: 25px;
+    flex: 1;
 }
 
-        .page-title {
-            text-align: center;
-            color: #000;
-            margin: 50px 0;
-            font-size: 28px;
-            font-weight: bold;
-        }
+label {
+    display: block;
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 8px;
+}
 
-        /* تنسيق نموذج الإدخال ليطابق الصورة */
-        .form-section {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 25px;
-            margin-top: 40px;
-        }
+input, textarea {
+    width: 100%;
+    border: 1px solid #999;
+    font-size: 16px;
+    padding: 8px;
+    box-sizing: border-box;
+}
 
-        .input-row {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            width: 500px; /* التحكم بعرض الحقل والمسافة */
-        }
+input {
+    height: 38px;
+}
 
-        .input-row label {
-            font-weight: bold;
-            font-size: 18px;
-            width: 150px;
-            text-align: right;
-        }
+textarea {
+    height: 120px;
+    resize: none;
+    font-family: "Segoe UI", Tahoma, sans-serif;
+}
 
-        .input-row input {
-            width: 300px;
-            padding: 10px;
-            border: 1px solid #777;
-            font-size: 16px;
-            text-align: right;
-        }
+.readonly {
+    background: #f3f3f3;
+}
 
-        /* جعل حقول البيانات الثابتة بخلفية رمادية قليلاً */
-        .input-row input[readonly] {
-            background-color: #fafafa;
-            color: #333;
-        }
+.buttons {
+    text-align: center;
+    margin-top: 35px;
+}
 
-        /* أزرار الإجراءات السفلية */
-        .action-buttons {
-            display: flex;
-            justify-content: center;
-            gap: 50px;
-            margin-top: 80px;
-        }
+.btn {
+    width: 130px;
+    height: 45px;
+    background: royalblue;
+    color: white;
+    border: none;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    margin: 0 8px;
+}
 
-        .btn-action {
-            background-color: #4873c4;
-            color: white;
-            border: none;
-            padding: 12px 60px;
-            font-size: 18px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: 0.3s;
-            border-radius: 2px;
-        }
-
-        .btn-action:hover {
-            background-color: #365a9e;
-        }
-
-        /* زر AI العائم على اليسار */
-        .btn-ai {
-            position: absolute;
-            left: 80px;
-            top: 40%;
-            background-color: #4873c4;
-            color: white;
-            border: none;
-            width: 70px;
-            height: 70px;
-            font-size: 22px;
-            font-weight: bold;
-            cursor: pointer;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .btn-ai:hover {
-            background-color: #365a9e;
-        }
-
-        /* رسالة النجاح */
-        .alert-success {
-            text-align: center;
-            color: #155724;
-            background-color: #d4edda;
-            padding: 10px;
-            margin: 20px auto;
-            width: 50%;
-            border: 1px solid #c3e6cb;
-            border-radius: 5px;
-        }
-    </style>
+.message {
+    text-align: center;
+    color: red;
+    font-weight: bold;
+    margin-bottom: 20px;
+}
+</style>
 </head>
+
 <body>
 
-    <div class="main-container">
-        
-        <div class="header-banner">
-               <div class="header-banner">
-    <img src="photo.jpeg" alt="شعار دائرة ضريبة الدخل والمبيعات" class="header-image">
+<div class="container">
+
+<div class="header">
+    <img src="photo.jpeg">
 </div>
-        </div>
 
-        <?php if (isset($success_message)): ?>
-            <div class="alert-success"><?php echo $success_message; ?></div>
-        <?php endif; ?>
+<div class="title">إلغاء تسجيل مكلف</div>
 
-        <div class="page-title">إلغاء تسجيل مكلف</div>
+<?php if ($message !== ""): ?>
+<div class="message"><?= htmlspecialchars($message) ?></div>
+<?php endif; ?>
 
-        <button type="button" class="btn-ai">AI</button>
+<form method="POST">
 
-        <form method="POST" action="">
-            <div class="form-section">
-                
-                <div class="input-row">
-                    <label>رقم المكلف</label>
-                    <input type="text" name="taxpayer_number" value="<?php echo htmlspecialchars($taxpayer_number); ?>" readonly>
-                </div>
+<div class="form-box">
 
-                <div class="input-row">
-                    <label>اسم المكلف</label>
-                    <input type="text" name="taxpayer_name" value="<?php echo htmlspecialchars($taxpayer_name); ?>" readonly>
-                </div>
-
-                <div class="input-row">
-                    <label>سبب إلغاء التسجيل</label>
-                    <input type="text" name="cancel_reason" required placeholder="أدخل السبب هنا...">
-                </div>
-
-            </div>
-
-            <div class="action-buttons">
-                <button type="button" class="btn-action" onclick="window.location.href='mains.php'">إلغاء</button>
-                <button type="submit" class="btn-action">إرسال</button>
-            </div>
-        </form>
-
+<div class="top-row">
+    <div class="group">
+        <label>رقم المكلف</label>
+        <input type="text" value="<?= htmlspecialchars($taxpayer["taxpayer_number"]) ?>" readonly class="readonly">
     </div>
+
+    <div class="group">
+        <label>اسم المكلف</label>
+        <input type="text" value="<?= htmlspecialchars($taxpayer["taxpayer_name"]) ?>" readonly class="readonly">
+    </div>
+</div>
+
+<div class="group">
+    <label>سبب إلغاء التسجيل</label>
+    <textarea name="cancel_reason" required></textarea>
+</div>
+
+<div class="buttons">
+    <button type="submit" name="send" class="btn">إرسال</button>
+    <button type="reset" class="btn">إلغاء</button>
+    <button type="button" onclick="window.location.href='mains.php'" class="btn">رجوع</button>
+</div>
+
+</div>
+
+</form>
+
+</div>
 
 </body>
 </html>
